@@ -3,7 +3,7 @@
  * For production, this base URL would come from an environment variable.
  */
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://gdg-house-black.onrender.com';
 
 async function fetchJSON(path) {
   const res = await fetch(`${BASE_URL}${path}`);
