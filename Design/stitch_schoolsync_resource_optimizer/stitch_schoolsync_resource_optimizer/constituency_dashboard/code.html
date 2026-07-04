@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SchoolSync | Constituency Governance Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#111516",
+                        "on-secondary-fixed-variant": "#005049",
+                        "primary-fixed-dim": "#bcc7de",
+                        "tertiary-container": "#26292b",
+                        "surface-bright": "#fbf8fa",
+                        "on-secondary-fixed": "#00201d",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-variant": "#e4e2e3",
+                        "surface-dim": "#dcd9db",
+                        "tertiary-fixed": "#e0e3e5",
+                        "outline-variant": "#c5c6cd",
+                        "on-primary-fixed": "#111c2d",
+                        "on-tertiary-fixed": "#191c1e",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#303032",
+                        "primary-fixed": "#d8e3fb",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#c4c7c9",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#545f73",
+                        "on-surface": "#1b1b1d",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "outline": "#75777d",
+                        "background": "#fbf8fa",
+                        "secondary-container": "#86f2e4",
+                        "surface-container": "#f0edef",
+                        "on-tertiary-container": "#8d9092",
+                        "inverse-primary": "#bcc7de",
+                        "surface-container-highest": "#e4e2e3",
+                        "surface-container-high": "#eae7e9",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#45474c",
+                        "on-tertiary-fixed-variant": "#444749",
+                        "surface-container-low": "#f5f3f4",
+                        "secondary-fixed": "#89f5e7",
+                        "primary-container": "#1e293b",
+                        "on-secondary-container": "#006f66",
+                        "on-primary": "#ffffff",
+                        "primary": "#091426",
+                        "on-error-container": "#93000a",
+                        "surface": "#fbf8fa",
+                        "on-background": "#1b1b1d",
+                        "on-primary-container": "#8590a6",
+                        "on-error": "#ffffff",
+                        "secondary": "#006a61",
+                        "on-primary-fixed-variant": "#3c475a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "container-max": "1440px",
+                        "stack-md": "16px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "40px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-sm": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "label-md": ["12px", {"lineHeight": "1", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid #E2E8F0; }
+        .status-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .status-green { background-color: rgba(13, 148, 136, 0.1); color: #0D9488; }
+        .status-orange { background-color: rgba(245, 158, 11, 0.1); color: #D97706; }
+        .status-red { background-color: rgba(220, 38, 38, 0.1); color: #DC2626; }
+        .map-pin { transition: transform 0.2s ease-in-out; cursor: pointer; }
+        .map-pin:hover { transform: scale(1.5) translateY(-4px); }
+    </style>
+</head>
+<body class="text-on-surface">
+<div class="flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="h-screen sticky left-0 w-64 bg-surface-container-low dark:bg-tertiary border-r border-outline-variant flex flex-col py-stack-lg px-stack-md space-y-stack-sm hidden md:flex z-50">
+<div class="mb-stack-lg px-2">
+<h1 class="font-headline-sm text-headline-sm font-black text-primary dark:text-primary-fixed">SchoolSync</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold opacity-70">Governance Engine</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center space-x-3 px-4 py-3 bg-secondary-container text-on-secondary-container font-semibold rounded-lg cursor-pointer transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex items-center space-x-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg cursor-pointer transition-all active:translate-x-1" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-label-md text-label-md">Analytics</span>
+</a>
+<a class="flex items-center space-x-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg cursor-pointer transition-all active:translate-x-1" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-label-md text-label-md">Insights</span>
+</a>
+<a class="flex items-center space-x-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg cursor-pointer transition-all active:translate-x-1" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+</nav>
+<div class="pt-stack-lg border-t border-outline-variant space-y-1">
+<a class="flex items-center space-x-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg cursor-pointer transition-all" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Support</span>
+</a>
+<a class="flex items-center space-x-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg cursor-pointer transition-all" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Sign Out</span>
+</a>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+<!-- TopNavBar -->
+<header class="w-full top-0 sticky bg-surface-bright dark:bg-tertiary shadow-sm z-40">
+<div class="flex justify-between items-center h-16 px-margin-desktop w-full max-w-container-max mx-auto">
+<div class="flex items-center space-x-6 flex-1">
+<div class="relative w-full max-w-md hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-secondary text-body-md font-body-md" placeholder="Search schools, constituencies..." type="text"/>
+</div>
+<div class="flex items-center space-x-2 text-on-surface-variant hover:text-secondary cursor-pointer transition-colors px-3 py-1.5 rounded-lg border border-outline-variant">
+<span class="material-symbols-outlined text-sm">location_on</span>
+<span class="font-label-md text-label-md font-bold">Constituency: Bangalore Central</span>
+</div>
+</div>
+<div class="flex items-center space-x-stack-lg">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-secondary transition-colors active:scale-95">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-secondary transition-colors active:scale-95">settings</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border-2 border-secondary-container">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a government education official with a neutral expression, wearing a formal suit, set against a blurred office background with soft corporate lighting. The portrait style is crisp, modern, and high-quality, fitting a premium SaaS environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDY_ViyEqKbNIXmguC4NT_eLyqcSXVgQ3BbwcDJWN2xJn8sI0QtnZYuc36a7pzO6ocwQgH8n15TEwV5ZMNHVcaKjEEwVhNe6E2lCX-rwPPoQ9Wx0dAIszCkipla-vwLIjtf2h7DsFkYAi4Qnd6St70WD4g1AlnY9ANsWr_i-NYpfMztRA8D5V6JWp94yg7w_GeJE4cIbzLJ9cvYNLNCQSNEnFwv8GWilGLdvW_vVQxcsrNjBAJoa80P"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Dashboard Content -->
+<div class="p-margin-desktop space-y-gutter overflow-y-auto">
+<!-- Stat Cards Row -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow group">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-primary bg-primary-fixed p-2 rounded-lg">school</span>
+<div class="status-badge status-green">In Range</div>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">Total Schools</h3>
+<p class="font-headline-lg text-headline-lg text-primary">1,284</p>
+<div class="mt-2 text-[10px] text-on-surface-variant font-medium">98.2% Active Status</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow group">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-error bg-error-container p-2 rounded-lg">person_off</span>
+<div class="status-badge status-red">Critical</div>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">Zero-Enrollment</h3>
+<p class="font-headline-lg text-headline-lg text-error">12</p>
+<div class="mt-2 text-[10px] text-on-surface-variant font-medium">Requiring immediate audit</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow group">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-secondary bg-secondary-container p-2 rounded-lg">diversity_3</span>
+<div class="status-badge status-orange">Warning</div>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">Single-Teacher</h3>
+<p class="font-headline-lg text-headline-lg text-secondary">48</p>
+<div class="mt-2 text-[10px] text-on-surface-variant font-medium">85% in rural clusters</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-stack-lg rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow group">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-primary bg-primary-fixed p-2 rounded-lg">groups</span>
+<div class="status-badge status-green">High Impact</div>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-1">Students Affected</h3>
+<p class="font-headline-lg text-headline-lg text-primary">4,520</p>
+<div class="mt-2 text-[10px] text-on-surface-variant font-medium">By proposed optimizations</div>
+</div>
+</div>
+<!-- Main Grid: Map & Sidebar -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter h-[calc(100vh-380px)] min-h-[500px]">
+<!-- Left: Interactive Map -->
+<div class="lg:col-span-8 relative bg-surface-container-high rounded-xl overflow-hidden border border-outline-variant shadow-inner">
+<div class="absolute inset-0 z-0">
+<div class="w-full h-full grayscale opacity-40 hover:grayscale-0 transition-all duration-700" data-alt="A high-resolution satellite top-down view of a dense urban school district in Bangalore, India. The map shows intricate street networks, clusters of school buildings with playgrounds, and green canopy coverage. The aesthetic is clean, professional, and slightly desaturated to allow UI overlays to pop." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDgIuKIok5jN52yZ1RQh37A_tJ6fSZkQxnRq-y5ss9NOXZiedmDwIaCUwASIcfMCVFng5zhj8r6QyTLMyB69VFikBRINoOPHk6KD7kPX_Rg0mEelkB7pI_qmoRobVDq81XPwlDGf-iUQYXhuBGQUlgTbgN5hnR3IjgpR9hjemo4ONvoIxugEyAxnqtZ5QtkE-5RusLRJdMjD9OOAc3fliYFXZ700TQAFUQiCNCnRz5JRbus5FMdGd9A')"></div>
+</div>
+<!-- Map HUD -->
+<div class="absolute top-4 left-4 z-10 space-y-2">
+<div class="glass-card px-4 py-2 rounded-lg shadow-sm flex items-center space-x-3">
+<div class="flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-teal-500"></span><span class="text-xs font-semibold">Healthy</span></div>
+<div class="flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-amber-500"></span><span class="text-xs font-semibold">Review</span></div>
+<div class="flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-red-500"></span><span class="text-xs font-semibold">Closure</span></div>
+</div>
+</div>
+<!-- School Pins (Simulation) -->
+<div class="absolute top-1/4 left-1/3 z-20 map-pin">
+<span class="material-symbols-outlined text-red-600 bg-white rounded-full shadow-lg p-1" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="absolute top-1/2 left-2/3 z-20 map-pin">
+<span class="material-symbols-outlined text-teal-600 bg-white rounded-full shadow-lg p-1" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="absolute bottom-1/3 left-1/2 z-20 map-pin">
+<span class="material-symbols-outlined text-amber-500 bg-white rounded-full shadow-lg p-1" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="absolute top-2/3 left-1/4 z-20 map-pin">
+<span class="material-symbols-outlined text-teal-600 bg-white rounded-full shadow-lg p-1" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<!-- Map Controls -->
+<div class="absolute bottom-4 right-4 z-10 flex flex-col space-y-2">
+<button class="w-10 h-10 glass-card rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm">
+<span class="material-symbols-outlined text-primary">add</span>
+</button>
+<button class="w-10 h-10 glass-card rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm">
+<span class="material-symbols-outlined text-primary">remove</span>
+</button>
+</div>
+</div>
+<!-- Right: AI Recommendations -->
+<div class="lg:col-span-4 flex flex-col space-y-stack-md h-full">
+<div class="flex items-center justify-between px-2">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<h2 class="font-headline-sm text-headline-sm text-primary">AI Insights</h2>
+</div>
+<span class="text-[10px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded font-bold">BETA</span>
+</div>
+<div class="flex-1 overflow-y-auto pr-1 space-y-stack-md custom-scrollbar">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm border-l-4 border-l-secondary hover:translate-x-1 transition-transform">
+<div class="flex justify-between items-start mb-3">
+<h4 class="font-body-md font-bold text-primary">Merge School A → School B</h4>
+<div class="status-badge status-green text-[10px]">RTE Compliant ✓</div>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-4">
+<div class="bg-surface-container rounded-lg p-2 flex flex-col items-center">
+<span class="text-[10px] text-on-surface-variant font-medium">Saves</span>
+<span class="font-bold text-secondary">2 Teachers</span>
+</div>
+<div class="bg-surface-container rounded-lg p-2 flex flex-col items-center">
+<span class="text-[10px] text-on-surface-variant font-medium">Distance</span>
+<span class="font-bold text-primary">0.8km</span>
+</div>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-relaxed mb-4">Merge redundant infrastructure at Subhash Nagar Primary into the modern hub at Central Academy.</p>
+<button class="w-full py-2 bg-secondary text-on-secondary rounded-lg font-label-md text-label-md hover:opacity-90 transition-opacity">Approve Analysis</button>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm border-l-4 border-l-amber-500 hover:translate-x-1 transition-transform opacity-90">
+<div class="flex justify-between items-start mb-3">
+<h4 class="font-body-md font-bold text-primary">Redistribute Grade 4 Staff</h4>
+<div class="status-badge status-orange text-[10px]">92% Efficiency Gain</div>
+</div>
+<div class="flex items-center space-x-3 text-[11px] text-on-surface-variant mb-4">
+<div class="flex items-center"><span class="material-symbols-outlined text-[14px] mr-1">group</span> 45 Students</div>
+<div class="flex items-center"><span class="material-symbols-outlined text-[14px] mr-1">timer</span> Urgent</div>
+</div>
+<button class="w-full py-2 border border-secondary text-secondary rounded-lg font-label-md text-label-md hover:bg-secondary-container transition-colors">View Logic</button>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm border-l-4 border-l-teal-600 hover:translate-x-1 transition-transform">
+<div class="flex justify-between items-start mb-3">
+<h4 class="font-body-md font-bold text-primary">Infrastructure Expansion</h4>
+<div class="status-badge status-green text-[10px]">Grant Eligible</div>
+</div>
+<div class="flex items-center space-x-4 mb-3">
+<div class="flex-1 bg-surface-container rounded-full h-1.5">
+<div class="bg-teal-500 h-1.5 rounded-full" style="width: 75%"></div>
+</div>
+<span class="text-[10px] font-bold">75% ROI</span>
+</div>
+<button class="w-full py-2 border border-outline-variant text-on-surface-variant rounded-lg font-label-md text-label-md hover:bg-surface-variant transition-colors">Dismiss</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="mt-auto w-full py-stack-lg border-t border-outline-variant bg-surface-container-lowest dark:bg-tertiary">
+<div class="flex flex-col md:flex-row justify-between items-center px-margin-desktop max-w-container-max mx-auto space-y-4 md:space-y-0">
+<p class="font-body-md text-body-md text-on-surface-variant opacity-70">© 2024 SchoolSync. Ministry of Education - Governance Portal.</p>
+<div class="flex items-center space-x-gutter">
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-secondary transition-colors" href="#">Privacy Policy</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-secondary transition-colors" href="#">Terms of Service</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-secondary transition-colors font-bold" href="#">Data Security</a>
+</div>
+</div>
+</footer>
+</main>
+</div>
+<!-- Floating Action Button -->
+<button class="fixed bottom-10 right-10 w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 group">
+<span class="material-symbols-outlined">add</span>
+<span class="absolute right-16 bg-primary text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">Manual Audit</span>
+</button>
+<script>
+        // Micro-interaction: Map Pin Bounce
+        const pins = document.querySelectorAll('.map-pin');
+        pins.forEach((pin, index) => {
+            pin.style.animation = `pin-bounce 2s infinite ease-in-out ${index * 0.4}s`;
+        });
+
+        // Add a style tag for pin animation
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes pin-bounce {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-10px); }
+            }
+            .custom-scrollbar::-webkit-scrollbar {
+                width: 4px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: #E2E8F0;
+                border-radius: 10px;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body></html>

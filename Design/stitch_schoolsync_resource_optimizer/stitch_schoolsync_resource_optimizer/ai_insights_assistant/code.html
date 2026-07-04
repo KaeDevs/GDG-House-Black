@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SchoolSync AI Insights</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#111516",
+                        "on-secondary-fixed-variant": "#005049",
+                        "primary-fixed-dim": "#bcc7de",
+                        "tertiary-container": "#26292b",
+                        "surface-bright": "#fbf8fa",
+                        "on-secondary-fixed": "#00201d",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-variant": "#e4e2e3",
+                        "surface-dim": "#dcd9db",
+                        "tertiary-fixed": "#e0e3e5",
+                        "outline-variant": "#c5c6cd",
+                        "on-primary-fixed": "#111c2d",
+                        "on-tertiary-fixed": "#191c1e",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#303032",
+                        "primary-fixed": "#d8e3fb",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#c4c7c9",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#545f73",
+                        "on-surface": "#1b1b1d",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "outline": "#75777d",
+                        "background": "#fbf8fa",
+                        "secondary-container": "#86f2e4",
+                        "surface-container": "#f0edef",
+                        "on-tertiary-container": "#8d9092",
+                        "inverse-primary": "#bcc7de",
+                        "surface-container-highest": "#e4e2e3",
+                        "surface-container-high": "#eae7e9",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#45474c",
+                        "on-tertiary-fixed-variant": "#444749",
+                        "surface-container-low": "#f5f3f4",
+                        "secondary-fixed": "#89f5e7",
+                        "primary-container": "#1e293b",
+                        "on-secondary-container": "#006f66",
+                        "on-primary": "#ffffff",
+                        "primary": "#091426",
+                        "on-error-container": "#93000a",
+                        "surface": "#fbf8fa",
+                        "on-background": "#1b1b1d",
+                        "on-primary-container": "#8590a6",
+                        "on-error": "#ffffff",
+                        "secondary": "#006a61",
+                        "on-primary-fixed-variant": "#3c475a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "gutter": "24px",
+                        "base": "4px",
+                        "container-max": "1440px",
+                        "stack-md": "16px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "40px",
+                        "stack-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-sm": ["18px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "1", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8FAFC; /* Level 0 Canvas */
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #E2E8F0;
+            border-radius: 10px;
+        }
+        .chat-bubble-ai {
+            position: relative;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="hidden md:flex flex-col h-full py-stack-lg px-stack-md space-y-stack-sm h-screen sticky left-0 w-64 bg-surface-container-low dark:bg-tertiary border-r border-outline-variant flat no shadows">
+<div class="px-4 mb-8">
+<h1 class="font-headline-sm text-headline-sm font-black text-primary dark:text-primary-fixed">SchoolSync</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Governance Engine</p>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg cursor-pointer transition-transform active:translate-x-1">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Home</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg cursor-pointer transition-transform active:translate-x-1">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-label-md text-label-md">Analytics</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container font-semibold rounded-lg cursor-pointer transition-transform active:translate-x-1">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-label-md text-label-md">Insights</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-lg cursor-pointer transition-transform active:translate-x-1">
+<span class="material-symbols-outlined">description</span>
+<span class="font-label-md text-label-md">Reports</span>
+</div>
+</nav>
+<div class="pt-stack-lg mt-auto border-t border-outline-variant space-y-1">
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Support</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Sign Out</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-w-0 bg-surface">
+<!-- Top App Bar -->
+<header class="w-full top-0 sticky bg-surface-bright dark:bg-tertiary shadow-sm z-10">
+<div class="flex justify-between items-center h-16 px-margin-desktop w-full max-w-container-max mx-auto">
+<div class="flex items-center gap-stack-md">
+<span class="material-symbols-outlined text-primary">psychology</span>
+<h2 class="font-headline-sm text-headline-sm font-bold text-primary">AI Insights Chat</h2>
+</div>
+<div class="flex items-center gap-stack-md">
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[18px]">map</span>
+<span class="text-label-md font-label-md">Constituency Selector</span>
+</button>
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a government official, clean studio lighting, high-end corporate style, neutral background, sharp focus, 8k resolution, minimalist professional attire." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkxgsiw6jcpZf-Lesr1ecuYgo2pd9UAEMn-6a-LR-sGUPdWlB79dh8ChF8vtyhcJIvzquKlZrsG-H_xFTU-q0v7F2BWsAr6vu7_Z1A53_LBB4ib61rW4E7cvBNoSNw9XTdzG-QD7VtP2E_yLFUZyfiRj-rPf5gWJ4-ZKQqBNNm3p1IpGHXrauu6uBArs1q4DAIBl1pwiQy1JDTaA2tWaxDHPTwjIooFQqtlWaR3QbS2pTO3YhhIrdi"/>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Chat Canvas -->
+<section class="flex-1 overflow-y-auto custom-scrollbar px-margin-desktop py-stack-lg">
+<div class="max-w-4xl mx-auto space-y-stack-lg">
+<!-- Date Indicator -->
+<div class="flex justify-center">
+<span class="px-4 py-1 bg-surface-container text-on-surface-variant rounded-full text-label-md font-label-md">Today, Oct 24</span>
+</div>
+<!-- AI Message: Greeting -->
+<div class="flex gap-4 items-start max-w-[85%]">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-container">smart_toy</span>
+</div>
+<div class="space-y-2">
+<div class="bg-surface-container-low p-4 rounded-xl rounded-tl-none border border-outline-variant shadow-sm chat-bubble-ai">
+<p class="font-body-md text-body-md text-on-surface">Good morning, Director. I've analyzed the latest staff distribution reports for the North Zone. How can I assist you with resource optimization today?</p>
+</div>
+<div class="flex gap-2">
+<span class="text-label-md font-label-md text-on-surface-variant opacity-60">9:41 AM</span>
+</div>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex gap-4 items-start flex-row-reverse">
+<div class="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-secondary">person</span>
+</div>
+<div class="space-y-2 flex flex-col items-end">
+<div class="bg-secondary text-on-secondary p-4 rounded-xl rounded-tr-none shadow-sm max-w-[80%]">
+<p class="font-body-md text-body-md">Compare enrollment and teacher counts for Green Valley High and Riverside Academy. I heard Riverside has a significant surplus.</p>
+</div>
+<span class="text-label-md font-label-md text-on-surface-variant opacity-60">9:42 AM</span>
+</div>
+</div>
+<!-- AI Message: Data Card Comparison -->
+<div class="flex gap-4 items-start max-w-full">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-container">smart_toy</span>
+</div>
+<div class="space-y-stack-md flex-1">
+<div class="bg-surface-container-low p-4 rounded-xl rounded-tl-none border border-outline-variant shadow-sm chat-bubble-ai">
+<div class="flex items-center gap-2 mb-stack-sm">
+<div class="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-200">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span class="text-[11px] font-bold tracking-tight uppercase">RTE Compliant</span>
+</div>
+<div class="flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full border border-orange-200">
+<span class="material-symbols-outlined text-[14px]">report_problem</span>
+<span class="text-[11px] font-bold tracking-tight uppercase">Needs Review</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface mb-stack-md">Based on the Q3 census, Riverside Academy indeed has a lower Student-Teacher Ratio (STR) than recommended, while Green Valley is currently over-leveraged.</p>
+<!-- Inline Data Card Bento -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+<!-- School A -->
+<div class="bg-surface-container-lowest p-4 rounded-lg border border-outline-variant hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-sm text-[16px] text-primary">Green Valley High</h4>
+<span class="px-2 py-0.5 bg-error-container text-on-error-container rounded text-[10px] font-bold">CRITICAL STR</span>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-label-md">
+<span class="text-on-surface-variant">Enrollment</span>
+<span class="font-bold text-primary">1,240</span>
+</div>
+<div class="flex justify-between text-label-md">
+<span class="text-on-surface-variant">Teachers</span>
+<span class="font-bold text-primary">31</span>
+</div>
+<div class="mt-3 pt-2 border-t border-outline-variant flex justify-between items-center">
+<span class="text-label-md font-bold text-on-surface-variant">STR Ratio</span>
+<span class="text-headline-sm text-error">40:1</span>
+</div>
+</div>
+</div>
+<!-- School B -->
+<div class="bg-surface-container-lowest p-4 rounded-lg border border-outline-variant hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-headline-sm text-[16px] text-primary">Riverside Academy</h4>
+<span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[10px] font-bold">SURPLUS</span>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-label-md">
+<span class="text-on-surface-variant">Enrollment</span>
+<span class="font-bold text-primary">820</span>
+</div>
+<div class="flex justify-between text-label-md">
+<span class="text-on-surface-variant">Teachers</span>
+<span class="font-bold text-primary">48</span>
+</div>
+<div class="mt-3 pt-2 border-t border-outline-variant flex justify-between items-center">
+<span class="text-label-md font-bold text-on-surface-variant">STR Ratio</span>
+<span class="text-headline-sm text-secondary">17:1</span>
+</div>
+</div>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface mt-stack-md">Transferring 6 teachers from Riverside to Green Valley would bring both institutions within the 30:1 compliance range.</p>
+</div>
+<span class="text-label-md font-label-md text-on-surface-variant opacity-60">9:43 AM</span>
+</div>
+</div>
+<!-- ThreeJS Atmospheric Backdrop for AI Generating state (Invisible normally) -->
+<div class="hidden" id="ai-generating-feedback">
+
+</div>
+</div>
+</section>
+<!-- Message Input Cluster -->
+<footer class="p-margin-desktop pt-0 bg-surface">
+<div class="max-w-4xl mx-auto space-y-stack-md">
+<!-- Quick Prompts -->
+<div class="flex flex-wrap gap-2">
+<button class="px-4 py-2 bg-surface-container-high hover:bg-secondary-container text-on-surface-variant hover:text-on-secondary-container transition-all rounded-full font-label-md text-label-md border border-outline-variant active:scale-95">
+                        Show mergeable schools
+                    </button>
+<button class="px-4 py-2 bg-surface-container-high hover:bg-secondary-container text-on-surface-variant hover:text-on-secondary-container transition-all rounded-full font-label-md text-label-md border border-outline-variant active:scale-95">
+                        Redistribute surplus staff
+                    </button>
+<button class="px-4 py-2 bg-surface-container-high hover:bg-secondary-container text-on-surface-variant hover:text-on-secondary-container transition-all rounded-full font-label-md text-label-md border border-outline-variant active:scale-95">
+                        Download compliance audit
+                    </button>
+</div>
+<!-- Chat Input Field -->
+<div class="relative group">
+<div class="absolute inset-0 bg-secondary/5 blur-xl rounded-full group-focus-within:bg-secondary/10 transition-all"></div>
+<div class="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-2xl p-2 focus-within:border-secondary focus-within:ring-1 focus-within:ring-secondary transition-all shadow-sm">
+<button class="p-2 text-on-surface-variant hover:text-secondary">
+<span class="material-symbols-outlined">attach_file</span>
+</button>
+<input class="flex-1 bg-transparent border-none focus:ring-0 px-3 py-2 font-body-md text-body-md text-on-surface" placeholder="Ask SchoolSync AI anything about educational data..." type="text"/>
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:text-secondary">
+<span class="material-symbols-outlined">mic</span>
+</button>
+<button class="bg-secondary text-on-secondary p-2.5 rounded-xl flex items-center justify-center hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex justify-between items-center text-[11px] text-on-tertiary-container uppercase font-bold tracking-widest px-2">
+<span>Privacy Policy &amp; Data Security Active</span>
+<span>Ministry of Education - Governance Portal</span>
+</div>
+</div>
+</footer>
+</main>
+<!-- Floating Action Button (Contextual) -->
+<div class="fixed bottom-32 right-margin-desktop md:hidden">
+<button class="w-14 h-14 bg-secondary text-on-secondary rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[28px]">add</span>
+</button>
+</div>
+<!-- Mobile Navigation Bar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-lowest shadow-2xl flex justify-around items-center h-16 px-4 z-50">
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">home</span>
+<span class="text-[10px] font-bold">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-[10px] font-bold">Analytics</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="text-[10px] font-bold">Insights</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-bold">Profile</span>
+</button>
+</nav>
+<script>
+        // Simple Interaction Logic
+        const input = document.querySelector('input');
+        const sendBtn = document.querySelector('button .material-symbols-outlined:contains("send")')?.parentElement;
+
+        input?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && input.value.trim() !== '') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const val = input.value;
+            if(!val) return;
+            
+            // Logic to append message would go here
+            console.log("Sending message:", val);
+            input.value = '';
+            
+            // Artificial delay to simulate AI response
+            const loader = document.getElementById('ai-generating-feedback');
+            loader?.classList.remove('hidden');
+            setTimeout(() => {
+                loader?.classList.add('hidden');
+            }, 2000);
+        }
+    </script>
+</body></html>
