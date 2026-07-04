@@ -17,11 +17,25 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow requests from the local Vite dev server and any localhost port
+# Allow requests dynamically based on CORS_ORIGINS environment variable
+import os
+
+cors_origins = os.getenv("CORS_ORIGINS")
+if cors_origins:
+    origins = [origin.strip() for origin in cors_origins.split(",")]
+else:
+    # Default to local development origins and allow-all wildcard for ease of deployment
+    origins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "*"
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
-    allow_credentials=True,
+    allow_origins=origins,
+    allow_credentials=False if "*" in origins else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
