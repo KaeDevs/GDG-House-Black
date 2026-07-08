@@ -1,20 +1,25 @@
-"""GET /api/schools — Returns all school records with their status classification."""
+"""GET /api/schools — Returns school records for a given district with status classification."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
+from typing import Optional
 from logic.optimizer import load_schools, get_school_status, get_summary_stats
 
 router = APIRouter()
 
 
 @router.get("/schools")
-async def get_schools():
+async def get_schools(district: Optional[str] = Query(None, description="Filter by district name, e.g. Chennai")):
     """
-    Returns all schools with a computed `status` field:
+    Returns schools with a computed `status` field, optionally filtered by district.
     - zero_enrollment: no students, merge candidate
     - overloaded: 1 teacher, >40 students
     - healthy: normal
+
+    Query params:
+      ?district=Chennai   → only Chennai schools
+      (omitted)           → all schools across all districts
     """
-    schools = load_schools()
+    schools = load_schools(district=district)
     for school in schools:
         school["status"] = get_school_status(school)
 
@@ -24,4 +29,5 @@ async def get_schools():
         "schools": schools,
         "stats": stats,
         "count": len(schools),
+        "district": district,
     }

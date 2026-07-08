@@ -49,5 +49,9 @@ async def root():
     return {
         "message": "SchoolSync API is running",
         "docs": "/docs",
-        "endpoints": ["/api/schools", "/api/recommendations"],
+        "endpoints": [
+            "/api/districts",
+            "/api/schools?district={name}",
+            "/api/recommendations?district={name}",
+        ],
     }

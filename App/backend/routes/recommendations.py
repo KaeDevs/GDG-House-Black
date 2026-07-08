@@ -1,17 +1,31 @@
-"""GET /api/recommendations — Runs the rationalization engine and returns recommendations."""
+"""GET /api/recommendations — Runs the rationalization engine for a given district."""
 
-from fastapi import APIRouter
-from logic.optimizer import build_recommendations, load_schools, get_school_status
+from fastapi import APIRouter, Query
+from typing import Optional
+from logic.optimizer import build_recommendations, get_available_districts
 
 router = APIRouter()
 
 
-@router.get("/recommendations")
-async def get_recommendations():
+@router.get("/districts")
+async def get_districts():
     """
-    Runs the greedy nearest-neighbor rationalization algorithm and returns:
-    - Merge recommendations (zero-enrollment → nearest same-type school)
-    - Redistribute recommendations (freed teacher → nearest understaffed school)
+    Returns the list of available districts/constituencies from the data file.
+    Each entry includes: id, name, state, center (lat/lng for map pan), zoom level.
+    """
+    districts = get_available_districts()
+    return {"districts": districts}
+
+
+@router.get("/recommendations")
+async def get_recommendations(district: Optional[str] = Query(None, description="Filter by district name")):
+    """
+    Runs the greedy nearest-neighbor rationalization algorithm for the given district
+    and returns merge + redistribute recommendations.
+
+    Query params:
+      ?district=Chennai   → only Chennai recommendations
+      (omitted)           → recommendations across all districts (not recommended for large data)
 
     Each recommendation includes:
     - type: 'merge' | 'redistribute'
@@ -20,21 +34,21 @@ async def get_recommendations():
     - rte_compliant: whether the recommendation satisfies RTE Act distance limits
     - reasoning: human-readable explanation
     """
-    recommendations = build_recommendations()
+    recommendations = build_recommendations(district=district)
 
-    # Compute summary counts for the frontend
-    merge_count = sum(1 for r in recommendations if r["type"] == "merge")
-    redistribute_count = sum(1 for r in recommendations if r["type"] == "redistribute")
+    merge_count         = sum(1 for r in recommendations if r["type"] == "merge")
+    redistribute_count  = sum(1 for r in recommendations if r["type"] == "redistribute")
     rte_compliant_count = sum(1 for r in recommendations if r["rte_compliant"])
-    rte_non_compliant_count = sum(1 for r in recommendations if not r["rte_compliant"])
+    rte_non_compliant   = sum(1 for r in recommendations if not r["rte_compliant"])
 
     return {
         "recommendations": recommendations,
+        "district": district,
         "summary": {
             "total": len(recommendations),
             "merge_count": merge_count,
             "redistribute_count": redistribute_count,
             "rte_compliant": rte_compliant_count,
-            "rte_non_compliant": rte_non_compliant_count,
+            "rte_non_compliant": rte_non_compliant,
         },
     }

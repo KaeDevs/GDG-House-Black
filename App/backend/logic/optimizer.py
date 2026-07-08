@@ -23,10 +23,68 @@ OVERLOAD_ENROLLMENT_THRESHOLD = 40
 # Max distance for teacher redistribution
 TEACHER_REDISTRIBUTION_MAX_KM = 10.0
 
+# District metadata — drives the /api/districts endpoint
+DISTRICT_META = {
+    "Chennai": {
+        "id": "Chennai",
+        "name": "Chennai",
+        "state": "Tamil Nadu",
+        "center": [13.0827, 80.2707],
+        "zoom": 12,
+    },
+    "Madurai": {
+        "id": "Madurai",
+        "name": "Madurai",
+        "state": "Tamil Nadu",
+        "center": [9.9252, 78.1198],
+        "zoom": 11,
+    },
+    "Coimbatore": {
+        "id": "Coimbatore",
+        "name": "Coimbatore",
+        "state": "Tamil Nadu",
+        "center": [11.0168, 76.9558],
+        "zoom": 12,
+    },
+}
 
-def load_schools():
+
+def load_schools(district: Optional[str] = None) -> list[dict]:
+    """
+    Load all schools from the flat JSON array.
+    If `district` is provided, return only schools whose district field matches
+    (case-insensitive). Otherwise return all schools.
+    """
     with open(DATA_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        all_schools = json.load(f)
+
+    if district:
+        return [s for s in all_schools if s.get("district", "").lower() == district.lower()]
+    return all_schools
+
+
+def get_available_districts() -> list[dict]:
+    """
+    Derive available district list from the schools data file, enriched with
+    metadata from DISTRICT_META.  Returns districts sorted alphabetically.
+    """
+    with open(DATA_PATH, "r", encoding="utf-8") as f:
+        all_schools = json.load(f)
+
+    seen = {}
+    for s in all_schools:
+        d = s.get("district", "")
+        if d and d not in seen:
+            meta = DISTRICT_META.get(d, {})
+            seen[d] = {
+                "id": d,
+                "name": meta.get("name", d),
+                "state": meta.get("state", "Tamil Nadu"),
+                "center": meta.get("center", []),
+                "zoom": meta.get("zoom", 12),
+            }
+
+    return sorted(seen.values(), key=lambda x: x["name"])
 
 
 def haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -63,9 +121,9 @@ def get_school_status(school: dict) -> str:
     return "healthy"
 
 
-def build_recommendations() -> list[dict]:
+def build_recommendations(district: Optional[str] = None) -> list[dict]:
     """
-    Core rationalization engine.
+    Core rationalization engine, optionally scoped to a single district.
 
     Greedy nearest-neighbor algorithm:
     1. Flag zero-enrollment schools as merge candidates.
@@ -77,7 +135,7 @@ def build_recommendations() -> list[dict]:
     - Google OR-Tools CP-SAT solver for vehicle-routing style assignment
     - PuLP for LP-based global optimization
     """
-    schools = load_schools()
+    schools = load_schools(district=district)
 
     # Classify all schools
     for s in schools:
@@ -85,7 +143,6 @@ def build_recommendations() -> list[dict]:
 
     zero_enrollment = [s for s in schools if s["status"] == "zero_enrollment"]
     overloaded = [s for s in schools if s["status"] == "overloaded"]
-    healthy = [s for s in schools if s["status"] == "healthy"]
 
     # Track which schools have already been matched (to avoid double-assignment)
     merged_school_ids = set()
@@ -189,13 +246,19 @@ def get_summary_stats(schools: list[dict]) -> dict:
     )
     total_students = sum(s["enrollment"] for s in schools)
     total_teachers = sum(s["teacher_count"] for s in schools)
+    single_teacher = sum(1 for s in schools if s["teacher_count"] == 1)
+    
+    # Calculate students in schools that require intervention
+    students_affected = sum(s["enrollment"] for s in schools if s.get("status", "healthy") != "healthy")
 
     return {
         "total_schools": total,
         "zero_enrollment_schools": zero_enroll,
         "overloaded_schools": overloaded_count,
+        "single_teacher_schools": single_teacher,
         "healthy_schools": total - zero_enroll - overloaded_count,
         "total_students": total_students,
+        "students_affected": students_affected,
         "total_teachers": total_teachers,
         "avg_student_teacher_ratio": round(total_students / total_teachers, 1) if total_teachers else 0,
     }
