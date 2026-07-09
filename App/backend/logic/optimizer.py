@@ -165,6 +165,50 @@ def generate_mock_schools(district: str) -> list[dict]:
         })
     return schools
 
+def generate_mock_schools_for_chennai() -> list[dict]:
+    # A pre-defined collection of 15 realistic schools in Chennai
+    mock_names = [
+        ("Government Primary School Korattur", "primary", 0, 1), # zero enrollment
+        ("Panchayat Union Primary School Ambattur", "primary", 52, 1), # overloaded
+        ("Government Upper Primary School Villivakkam", "upper-primary", 0, 1), # zero enrollment
+        ("Government Primary School Mogappair", "primary", 85, 2), # healthy
+        ("Panchayat Union Primary School Padi", "primary", 45, 1), # overloaded
+        ("Government Primary School Anna Nagar", "primary", 120, 4), # healthy
+        ("Zilla Parishad High School Kolathur", "upper-primary", 145, 5), # healthy
+        ("Government Primary School Koyambedu", "primary", 0, 1), # zero enrollment
+        ("Panchayat Union Primary School Aminjikarai", "primary", 58, 1), # overloaded
+        ("Government Model Primary School Nungambakkam", "primary", 95, 3), # healthy
+        ("Government Upper Primary School Egmore", "upper-primary", 110, 3), # healthy
+        ("Panchayat Union Primary School Chetpet", "primary", 35, 2), # healthy
+        ("Government Primary School T. Nagar", "primary", 72, 3), # healthy
+        ("Government Upper Primary School Saidapet", "upper-primary", 130, 4), # healthy
+        ("Government Model School Adyar", "primary", 150, 5), # healthy
+    ]
+    
+    center = [13.0827, 80.2707]
+    schools = []
+    
+    for idx, (name, s_type, enrollment, teachers) in enumerate(mock_names):
+        sid = f"CHN{1000 + idx}"
+        h = int(hashlib.md5(sid.encode()).hexdigest(), 16)
+        lat_offset = ((h % 1000) / 10000.0) - 0.05
+        lng_offset = (((h // 1000) % 1000) / 10000.0) - 0.05
+        lat = round(center[0] + lat_offset, 4)
+        lng = round(center[1] + lng_offset, 4)
+        
+        schools.append({
+            "school_id": sid,
+            "name": name,
+            "lat": lat,
+            "lng": lng,
+            "enrollment": enrollment,
+            "teacher_count": teachers,
+            "school_type": s_type,
+            "block": "Chennai Urban Block",
+            "district": "Chennai"
+        })
+    return schools
+
 async def load_schools(db: AsyncSession, district: Optional[str] = None) -> list[dict]:
     schools = []
     db_success = False
@@ -182,11 +226,20 @@ async def load_schools(db: AsyncSession, district: Optional[str] = None) -> list
     except Exception as e:
         print(f"Database query failed, falling back to mock data: {e}")
         
-    # --- Option B: Dynamic Mock Fallback ---
-    # If database is empty, contains no records for this district, or returns all zero-enrollment
-    # (common with partial dataset imports), fall back to rich dynamic mock data.
     dist_name = district or "Chennai"
-    if not db_success or len(schools) < 3:
+    
+    # ── Chennai Specific Showcase Mixing ─────────────────────────────
+    # If the user opens Chennai, we load backend data AND inject premium
+    # mock schools. This guarantees a populated, rich dashboard on startup.
+    if dist_name.lower() == "chennai":
+        mock_chennai = generate_mock_schools_for_chennai()
+        existing_ids = {s["school_id"] for s in schools}
+        for ms in mock_chennai:
+            if ms["school_id"] not in existing_ids:
+                schools.append(ms)
+                
+    # ── Fallback for other unpopulated/empty districts ───────────────
+    elif not db_success or len(schools) < 3:
         schools = generate_mock_schools(dist_name)
     else:
         # If schools exist but all or almost all are zero enrollment, inject healthy/overloaded variety
