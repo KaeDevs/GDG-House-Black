@@ -9,10 +9,23 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL not found in .env")
+    print("\n" + "=" * 80)
+    print(" ERROR: DATABASE_URL environment variable is not set!")
+    print(" - For local development: Create a '.env' file in App/backend/ and add:")
+    print("   DATABASE_URL=postgresql://user:password@localhost:5432/dbname")
+    print(" - For Render deployment: Add a 'DATABASE_URL' environment variable in your service settings,")
+    print("   or attach a PostgreSQL database service directly to this Web Service.")
+    print("=" * 80 + "\n")
+    raise RuntimeError(
+        "DATABASE_URL environment variable is missing. "
+        "Please configure it in Render's Environment Variables (or in a local '.env' file)."
+    )
 
 if "your-neon-hostname" in DATABASE_URL or "user:password" in DATABASE_URL:
-    raise RuntimeError("DATABASE_URL in .env still contains placeholder values. Please update it with your actual Neon credentials.")
+    raise RuntimeError(
+        "DATABASE_URL contains placeholder values ('your-neon-hostname' or 'user:password'). "
+        "Please update it with your actual database credentials."
+    )
 
 # Parse and print masked URL
 import urllib.parse
