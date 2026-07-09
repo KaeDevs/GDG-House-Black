@@ -28,11 +28,11 @@ export default function Dashboard() {
   // ── Chat state ─────────────────────────────────────────────────────────
   const [chatHistories, setChatHistories] = useState({});
 
-  const defaultWelcomeMessage = (districtName) => ({
+  const defaultWelcomeMessage = (districtName, textContent) => ({
     id: 'welcome',
     role: 'assistant',
     type: 'text',
-    content: `Good morning, Director. I've analyzed the latest staff distribution reports for ${districtName}. How can I assist you with resource optimization today?`,
+    content: textContent || `Good morning, Director. I've analyzed the latest staff distribution reports for ${districtName}. How can I assist you with resource optimization today?`,
     cards: [],
     time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   });
@@ -79,6 +79,9 @@ export default function Dashboard() {
   const [switching, setSwitching]           = useState(false); // district switch in-progress
   const [error, setError]                   = useState(null);
   const [loaded, setLoaded]                 = useState(false);
+  
+  const [searchInput, setSearchInput]       = useState('');
+  const [isSearching, setIsSearching]       = useState(false);
 
   // ── Close district menu on outside click ──────────────────────────────
   useEffect(() => {
@@ -114,9 +117,11 @@ export default function Dashboard() {
       setSwitching(true);
       setError(null);
 
-      const [schoolsData, recsData] = await Promise.all([
+      const [schoolsData, recsData, dashData, insightData] = await Promise.all([
         api.getSchools(district.id),
         api.getRecommendations(district.id),
+        api.getDashboard(district.id),
+        api.getInsights(district.id)
       ]);
 
       // Clear old data first so nothing stale remains on screen
@@ -125,8 +130,22 @@ export default function Dashboard() {
       setRecommendations([]);
 
       setSchools(schoolsData.schools || []);
-      setStats(schoolsData.stats || {});
+      setStats(dashData || {});
       setRecommendations(recsData.recommendations || []);
+      
+      // Update chat history with insight if empty
+      setChatHistories(prev => {
+        if (!prev[district.id] || prev[district.id].messages.length <= 1) {
+          return {
+            ...prev,
+            [district.id]: {
+              messages: [defaultWelcomeMessage(district.name, insightData.insight)],
+              usedPrompts: new Set()
+            }
+          };
+        }
+        return prev;
+      });
 
       if (!loaded) {
         setTimeout(() => setLoaded(true), 50);
@@ -140,10 +159,32 @@ export default function Dashboard() {
   }, [loaded]);
 
   useEffect(() => {
-    if (selectedDistrict) {
+    if (selectedDistrict && !searchInput) {
       fetchDistrictData(selectedDistrict);
     }
   }, [selectedDistrict]); // intentionally not including fetchDistrictData to avoid loop
+
+  // ── Search Effect ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!searchInput.trim()) {
+      if (selectedDistrict) fetchDistrictData(selectedDistrict);
+      return;
+    }
+    
+    const delay = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await api.searchSchools(searchInput);
+        setSchools(results || []);
+      } catch (err) {
+        console.error("Search failed", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+    
+    return () => clearTimeout(delay);
+  }, [searchInput]);
 
   // ── District selector handler ──────────────────────────────────────────
   const handleDistrictSelect = (district) => {
@@ -220,7 +261,16 @@ export default function Dashboard() {
             {/* Search */}
             <div style={{ position: 'relative', flex: 1 }}>
               <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'var(--on-surface-variant)' }}>search</span>
-              <input className="search-input" type="text" placeholder="Search schools, constituencies..." />
+              <input 
+                className="search-input" 
+                type="text" 
+                placeholder="Search schools, constituencies..." 
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+              />
+              {isSearching && (
+                <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--outline-variant)', borderTopColor: 'var(--secondary)', animation: 'spin 0.7s linear infinite' }} />
+              )}
             </div>
 
             {/* ── DISTRICT SELECTOR ─────────────────────────────────── */}

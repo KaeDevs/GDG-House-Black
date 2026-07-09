@@ -12,14 +12,23 @@ async function fetchJSON(path) {
 }
 
 export const api = {
-  /** Returns list of available districts: [{ id, name, state, center, zoom }] */
   getDistricts: () => fetchJSON('/api/districts'),
-
-  /** Returns schools (+ stats) filtered by district. district = null → all districts */
+  
   getSchools: (district = null) =>
     fetchJSON(district ? `/api/schools?district=${encodeURIComponent(district)}` : '/api/schools'),
-
-  /** Returns recommendations filtered by district. district = null → all districts */
+    
   getRecommendations: (district = null) =>
     fetchJSON(district ? `/api/recommendations?district=${encodeURIComponent(district)}` : '/api/recommendations'),
+    
+  getDashboard: (district = null) =>
+    fetchJSON(district ? `/api/dashboard?district=${encodeURIComponent(district)}` : '/api/dashboard'),
+    
+  getAnalytics: (district = null) =>
+    fetchJSON(district ? `/api/analytics?district=${encodeURIComponent(district)}` : '/api/analytics'),
+    
+  getInsights: (district = null) =>
+    fetchJSON(district ? `/api/insights?district=${encodeURIComponent(district)}` : '/api/insights'),
+    
+  searchSchools: (q) =>
+    fetchJSON(`/api/search?q=${encodeURIComponent(q)}`),
 };

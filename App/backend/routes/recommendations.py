@@ -43,8 +43,9 @@ async def get_recommendations(
 
     merge_count         = sum(1 for r in recommendations if r["type"] == "merge")
     redistribute_count  = sum(1 for r in recommendations if r["type"] == "redistribute")
-    rte_compliant_count = sum(1 for r in recommendations if r["rte_compliant"])
-    rte_non_compliant   = sum(1 for r in recommendations if not r["rte_compliant"])
+    infrastructure_count= sum(1 for r in recommendations if r["type"] == "infrastructure")
+    rte_compliant_count = sum(1 for r in recommendations if r.get("rte_compliant", True))
+    rte_non_compliant   = sum(1 for r in recommendations if not r.get("rte_compliant", True))
 
     return {
         "recommendations": recommendations,
@@ -53,6 +54,7 @@ async def get_recommendations(
             "total": len(recommendations),
             "merge_count": merge_count,
             "redistribute_count": redistribute_count,
+            "infrastructure_count": infrastructure_count,
             "rte_compliant": rte_compliant_count,
             "rte_non_compliant": rte_non_compliant,
         },

@@ -4,15 +4,17 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 
-load_dotenv()
+# Try to load .env for local development
+if os.path.exists(".env"):
+    load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL not found in .env")
+    raise RuntimeError("DATABASE_URL environment variable is missing. Configure it in App/backend/.env for local development or Render Environment Variables for production.")
 
 if "your-neon-hostname" in DATABASE_URL or "user:password" in DATABASE_URL:
-    raise RuntimeError("DATABASE_URL in .env still contains placeholder values. Please update it with your actual Neon credentials.")
+    raise RuntimeError("DATABASE_URL still contains placeholder values. Please update it with your actual Neon credentials.")
 
 # Parse and print masked URL
 import urllib.parse

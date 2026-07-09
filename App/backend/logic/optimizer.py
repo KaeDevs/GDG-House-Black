@@ -1,9 +1,5 @@
 """
-Haversine-based greedy nearest-neighbor optimization logic.
-
-MVP approach: simple greedy matching (not globally optimal).
-Production upgrade: Replace with Google OR-Tools or PuLP linear programming solver
-for globally optimal teacher-school assignment.
+Haversine-based greedy nearest-neighbor optimization logic and SQL query builders.
 """
 
 import math
@@ -22,148 +18,127 @@ OVERLOAD_ENROLLMENT_THRESHOLD = 40
 # Max distance for teacher redistribution
 TEACHER_REDISTRIBUTION_MAX_KM = 10.0
 
-# District metadata — drives the /api/districts endpoint
-DISTRICT_META = {
-    "Chennai": {
-        "id": "Chennai",
-        "name": "Chennai",
-        "state": "Tamil Nadu",
-        "center": [13.0827, 80.2707],
-        "zoom": 12,
-    },
-    "Madurai": {
-        "id": "Madurai",
-        "name": "Madurai",
-        "state": "Tamil Nadu",
-        "center": [9.9252, 78.1198],
-        "zoom": 11,
-    },
-    "Coimbatore": {
-        "id": "Coimbatore",
-        "name": "Coimbatore",
-        "state": "Tamil Nadu",
-        "center": [11.0168, 76.9558],
-        "zoom": 12,
-    },
-}
-
+ENROLLMENT_COLS = [
+    'enrolment1_cpp_b', 'enrolment1_cpp_g', 'enrolment1_c1_b', 'enrolment1_c1_g', 
+    'enrolment1_c2_b', 'enrolment1_c2_g', 'enrolment1_c3_b', 'enrolment1_c3_g', 
+    'enrolment1_c4_b', 'enrolment1_c4_g', 'enrolment1_c5_b', 'enrolment1_c5_g', 
+    'enrolment1_c6_b', 'enrolment1_c6_g', 'enrolment1_c7_b', 'enrolment1_c7_g', 
+    'enrolment1_c8_b', 'enrolment1_c8_g', 'enrolment1_c9_b', 'enrolment1_c9_g', 
+    'enrolment1_c10_b', 'enrolment1_c10_g', 'enrolment1_c11_b', 'enrolment1_c11_g', 
+    'enrolment1_c12_b', 'enrolment1_c12_g'
+]
+ENROLLMENT_SQL = " + ".join([f"COALESCE({c}, 0)" for c in ENROLLMENT_COLS])
+VALID_DATA_CONDITION = f"(COALESCE(teacher_total_tch, 0) > 0 OR ({ENROLLMENT_SQL}) > 0)"
 
 def generate_coords(school_id: str, district: str) -> tuple[float, float]:
-    center = DISTRICT_META.get(district, DISTRICT_META.get("Chennai"))["center"]
+    # generic fallback center for India if not mapped
+    center = [20.5937, 78.9629]
     h = int(hashlib.md5(school_id.encode()).hexdigest(), 16)
-    # deterministic random offset between -0.1 and 0.1 degrees
-    lat_offset = ((h % 1000) / 5000.0) - 0.1
-    lng_offset = (((h // 1000) % 1000) / 5000.0) - 0.1
+    # deterministic random offset
+    lat_offset = ((h % 1000) / 50.0) - 1.0
+    lng_offset = (((h // 1000) % 1000) / 50.0) - 1.0
     return round(center[0] + lat_offset, 4), round(center[1] + lng_offset, 4)
-
-def format_school(mapping: dict) -> dict:
-    sid = str(mapping.get("pseudocode", ""))
-    d = mapping.get("district", "Chennai")
-    
-    # Calculate total enrolment from enrolment1 if available
-    enrollment = 0
-    for k, v in mapping.items():
-        if k.startswith("enrolment1_c") and isinstance(v, (int, float)):
-            enrollment += int(v)
-            
-    lat, lng = generate_coords(sid, d)
-    
-    return {
-        "school_id": sid,
-        "name": f"{mapping.get('school_category', 'School')} {mapping.get('lgd_vill_name', sid)}",
-        "lat": lat,
-        "lng": lng,
-        "enrollment": enrollment,
-        "teacher_count": int(mapping.get("teacher_total_tch") or 0),
-        "school_type": mapping.get("school_type", "primary"),
-        "block": mapping.get("block", ""),
-        "district": d
-    }
-
-async def load_schools(db: AsyncSession, district: Optional[str] = None) -> list[dict]:
-    query_str = "SELECT * FROM school_complete"
-    if district:
-        query_str += " WHERE district ILIKE :district"
-        res = await db.execute(text(query_str), {"district": f"%{district}%"})
-    else:
-        res = await db.execute(text(query_str))
-        
-    schools = []
-    for row in res:
-        schools.append(format_school(dict(row._mapping)))
-    return schools
 
 
 async def get_available_districts(db: AsyncSession) -> list[dict]:
-    res = await db.execute(text("SELECT DISTINCT district FROM school_complete ORDER BY district"))
-    districts = [row[0] for row in res if row[0]]
-    
-    seen = []
-    for d in districts:
-        meta = DISTRICT_META.get(d, {})
-        seen.append({
+    query = text(f"""
+        SELECT DISTINCT district, state 
+        FROM school_complete 
+        WHERE district IS NOT NULL AND state IS NOT NULL AND {VALID_DATA_CONDITION}
+        ORDER BY state, district
+    """)
+    res = await db.execute(query)
+    districts = []
+    for row in res:
+        d = row.district
+        s = row.state
+        districts.append({
             "id": d,
-            "name": meta.get("name", d),
-            "state": meta.get("state", "Tamil Nadu"),
-            "center": meta.get("center", [13.0827, 80.2707]),
-            "zoom": meta.get("zoom", 12),
+            "name": d,
+            "state": s,
+            "center": [], # Map component should handle bounds automatically or we ignore it
+            "zoom": 10,
         })
-    return seen
+    return districts
 
 
-def haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    """
-    Calculate the great-circle distance between two points on Earth in kilometres.
-    Uses the Haversine formula. This is sufficient precision for inter-school distances.
-    """
-    R = 6371.0  # Earth radius in km
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lng2 - lng1)
+def format_school_row(row_mapping: dict) -> dict:
+    sid = str(row_mapping.get("pseudocode") or "")
+    d = row_mapping.get("district") or "Unknown"
+    
+    # Check if lat/long exist in db row, else generate
+    lat = row_mapping.get("latitude") or row_mapping.get("lat")
+    lng = row_mapping.get("longitude") or row_mapping.get("lon")
+    if not lat or not lng:
+        lat, lng = generate_coords(sid, d)
+        
+    enrollment = int(row_mapping.get("total_enrollment") or 0)
+    teacher_count = int(row_mapping.get("teacher_total_tch") or 0)
+    
+    status = "healthy"
+    if enrollment == 0:
+        status = "zero_enrollment"
+    elif teacher_count == 1 and enrollment > OVERLOAD_ENROLLMENT_THRESHOLD:
+        status = "overloaded"
+    elif teacher_count == 0 and enrollment > 0:
+        status = "understaffed"
 
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return round(R * c, 3)
-
-
-def rte_limit(school_type: str) -> float:
-    """Return the RTE distance limit for the given school type."""
-    return RTE_PRIMARY_MAX_KM if school_type == "primary" else RTE_UPPER_PRIMARY_MAX_KM
-
-
-def get_school_status(school: dict) -> str:
-    """
-    Classify a school into one of three statuses:
-    - 'zero_enrollment': no students, candidate for closure/merge
-    - 'overloaded': single teacher with too many students
-    - 'healthy': normal operation
-    """
-    if school["enrollment"] == 0:
-        return "zero_enrollment"
-    if school["teacher_count"] == 1 and school["enrollment"] > OVERLOAD_ENROLLMENT_THRESHOLD:
-        return "overloaded"
-    return "healthy"
+    return {
+        "school_id": sid,
+        "name": f"{row_mapping.get('school_category', 'School')} {row_mapping.get('lgd_vill_name', sid)}",
+        "lat": lat,
+        "lng": lng,
+        "enrollment": enrollment,
+        "teacher_count": teacher_count,
+        "school_type": row_mapping.get("school_type", "primary"),
+        "block": row_mapping.get("block", ""),
+        "district": d,
+        "status": status,
+        "facilities": {
+            "electricity": bool(row_mapping.get("facility_electricity_availability")),
+            "water": bool(row_mapping.get("facility_pack_water_fun_yn") or row_mapping.get("facility_pack_water_yn")),
+            "toilet": bool(row_mapping.get("facility_total_boys_func_toilet") or row_mapping.get("facility_total_girls_func_toilet")),
+            "boundary_wall": bool(row_mapping.get("facility_boundary_wall")),
+            "library": bool(row_mapping.get("facility_library_availability"))
+        }
+    }
 
 
 async def build_recommendations(db: AsyncSession, district: Optional[str] = None) -> list[dict]:
-    schools = await load_schools(db, district=district)
+    # We only fetch schools that need recommendations or can be targets to save memory.
+    # But to keep it simple and within the limit of memory for a single district,
+    # we can fetch the necessary columns for all schools in the district.
+    query_str = f"""
+        SELECT 
+            pseudocode, district, lgd_vill_name, school_category, school_type, block,
+            teacher_total_tch,
+            ({ENROLLMENT_SQL}) as total_enrollment,
+            facility_electricity_availability, facility_pack_water_yn, facility_pack_water_fun_yn,
+            facility_total_boys_func_toilet, facility_total_girls_func_toilet, facility_boundary_wall, facility_library_availability
+        FROM school_complete
+        WHERE {VALID_DATA_CONDITION}
+    """
+    
+    params = {}
+    if district:
+        query_str += " AND district ILIKE :district"
+        params["district"] = f"%{district}%"
+        
+    res = await db.execute(text(query_str), params)
+    schools = [format_school_row(dict(row._mapping)) for row in res]
 
-    # Classify all schools
-    for s in schools:
-        s["status"] = get_school_status(s)
+    recommendations = []
+    
+    # Track schools to avoid double assignment
+    merged_school_ids = set()
+    freed_teachers = []
 
     zero_enrollment = [s for s in schools if s["status"] == "zero_enrollment"]
     overloaded = [s for s in schools if s["status"] == "overloaded"]
+    understaffed = overloaded[:] # clone
 
-    # Track which schools have already been matched (to avoid double-assignment)
-    merged_school_ids = set()
-    recommendations = []
-
-    # ── STEP 1: Generate MERGE recommendations ────────────────────────────
-    freed_teachers = []  # accumulate teachers freed by merges
-
+    # Merge recommendations
     for src in zero_enrollment:
-        # Find all candidate target schools: same type, not also zero-enrollment
         candidates = [
             s for s in schools
             if s["school_type"] == src["school_type"]
@@ -172,96 +147,90 @@ async def build_recommendations(db: AsyncSession, district: Optional[str] = None
             and s["school_id"] not in merged_school_ids
         ]
 
-        if not candidates:
-            continue
+        if candidates:
+            candidates_with_dist = [(s, haversine(src["lat"], src["lng"], s["lat"], s["lng"])) for s in candidates]
+            candidates_with_dist.sort(key=lambda x: x[1])
+            target, dist = candidates_with_dist[0]
+            
+            rte_ok = dist <= (RTE_PRIMARY_MAX_KM if src["school_type"] == "primary" else RTE_UPPER_PRIMARY_MAX_KM)
 
-        # Greedy: pick the nearest candidate
-        candidates_with_dist = [
-            (s, haversine(src["lat"], src["lng"], s["lat"], s["lng"]))
-            for s in candidates
-        ]
-        candidates_with_dist.sort(key=lambda x: x[1])
-        target, dist = candidates_with_dist[0]
-
-        limit = rte_limit(src["school_type"])
-        rte_ok = dist <= limit
-
-        recommendations.append({
-            "type": "merge",
-            "source_school": src,
-            "target_school": target,
-            "distance_km": dist,
-            "rte_compliant": rte_ok,
-            "reasoning": (
-                f"Zero-enrollment school '{src['name']}' recommended for closure and merger into "
-                f"'{target['name']}' ({dist:.2f} km away). "
-                + ("Within RTE distance limit." if rte_ok
-                   else f"⚠ Exceeds RTE {limit}km limit — consider intermediate transport provision.")
-            ),
-        })
-
-        merged_school_ids.add(src["school_id"])
-
-        # Each merged school frees up its teacher(s)
-        freed_teachers.extend([src] * src["teacher_count"])
-
-    # ── STEP 2: Generate REDISTRIBUTE recommendations ─────────────────────
-    # All overloaded schools plus any that still need teachers
-    understaffed = overloaded[:]
-
+            recommendations.append({
+                "type": "merge",
+                "source_school": src,
+                "target_school": target,
+                "distance_km": dist,
+                "rte_compliant": rte_ok,
+                "reasoning": f"Zero-enrollment school '{src['name']}' recommended for closure and merger into '{target['name']}' ({dist:.2f} km away)."
+            })
+            merged_school_ids.add(src["school_id"])
+            freed_teachers.extend([src] * src["teacher_count"])
+            
+    # Redistribute recommendations
     for teacher_source in freed_teachers:
         if not understaffed:
-            break  # no more understaffed schools to fill
-
-        # Find nearest understaffed school within redistribution cap
-        candidates_with_dist = [
-            (s, haversine(
-                teacher_source["lat"], teacher_source["lng"],
-                s["lat"], s["lng"]
-            ))
-            for s in understaffed
-        ]
+            break
+            
+        candidates_with_dist = [(s, haversine(teacher_source["lat"], teacher_source["lng"], s["lat"], s["lng"])) for s in understaffed]
         candidates_with_dist.sort(key=lambda x: x[1])
         target, dist = candidates_with_dist[0]
+        
+        if dist <= TEACHER_REDISTRIBUTION_MAX_KM:
+            recommendations.append({
+                "type": "redistribute",
+                "source_school": teacher_source,
+                "target_school": target,
+                "distance_km": dist,
+                "rte_compliant": True,
+                "reasoning": f"Teacher freed from '{teacher_source['name']}' recommended for redeployment to overloaded school '{target['name']}' ({dist:.2f} km away)."
+            })
+            understaffed.remove(target)
 
-        if dist > TEACHER_REDISTRIBUTION_MAX_KM:
-            # Too far for practical redistribution — skip
+    # Infrastructure recommendations
+    for s in schools:
+        if s["status"] == "zero_enrollment" or s["school_id"] in merged_school_ids:
             continue
-
-        recommendations.append({
-            "type": "redistribute",
-            "source_school": teacher_source,
-            "target_school": target,
-            "distance_km": dist,
-            "rte_compliant": True,  # teacher redistribution has no strict RTE distance limit
-            "reasoning": (
-                f"Teacher freed from '{teacher_source['name']}' (merged school) recommended "
-                f"for redeployment to '{target['name']}' ({dist:.2f} km away), "
-                f"which has {target['enrollment']} students but only {target['teacher_count']} teacher(s)."
-            ),
-        })
-
-        # Remove matched school from understaffed list (greedy: one teacher per school for MVP)
-        understaffed.remove(target)
+            
+        if not s["facilities"]["water"]:
+            recommendations.append({
+                "type": "infrastructure",
+                "source_school": s,
+                "reasoning": f"School '{s['name']}' is missing functional drinking water facilities."
+            })
+        if not s["facilities"]["toilet"]:
+            recommendations.append({
+                "type": "infrastructure",
+                "source_school": s,
+                "reasoning": f"School '{s['name']}' requires urgent toilet construction."
+            })
+        if not s["facilities"]["electricity"]:
+            recommendations.append({
+                "type": "infrastructure",
+                "source_school": s,
+                "reasoning": f"School '{s['name']}' lacks electricity connection."
+            })
 
     return recommendations
 
+def haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(R * c, 3)
 
 def get_summary_stats(schools: list[dict]) -> dict:
-    """Return aggregated statistics for the stat cards on the dashboard."""
     total = len(schools)
-    zero_enroll = sum(1 for s in schools if s["enrollment"] == 0)
-    overloaded_count = sum(
-        1 for s in schools
-        if s["teacher_count"] == 1 and s["enrollment"] > OVERLOAD_ENROLLMENT_THRESHOLD
-    )
+    zero_enroll = sum(1 for s in schools if s["status"] == "zero_enrollment")
+    single_teacher = sum(1 for s in schools if s["teacher_count"] == 1)
+    overloaded_count = sum(1 for s in schools if s["status"] == "overloaded")
+    
     total_students = sum(s["enrollment"] for s in schools)
     total_teachers = sum(s["teacher_count"] for s in schools)
-    single_teacher = sum(1 for s in schools if s["teacher_count"] == 1)
     
-    # Calculate students in schools that require intervention
-    students_affected = sum(s["enrollment"] for s in schools if s.get("status", "healthy") != "healthy")
-
+    students_affected = sum(s["enrollment"] for s in schools if s["status"] != "healthy")
+    
     return {
         "total_schools": total,
         "zero_enrollment_schools": zero_enroll,

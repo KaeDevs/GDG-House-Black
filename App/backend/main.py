@@ -40,8 +40,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from routes.api import router as api_router
+
 app.include_router(schools_router, prefix="/api")
 app.include_router(recommendations_router, prefix="/api")
+app.include_router(api_router, prefix="/api")
 
 
 @app.get("/")

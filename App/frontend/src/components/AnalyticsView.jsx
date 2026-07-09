@@ -5,63 +5,31 @@ import {
 } from 'recharts';
 
 export default function AnalyticsView({ selectedDistrict, schools, loading }) {
-  const [allSchools, setAllSchools] = useState([]);
+  const [enrollmentData, setEnrollmentData] = useState([]);
+  const [comparisonData, setComparisonData] = useState([]);
   const [loadingAll, setLoadingAll] = useState(true);
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [filterText, setFilterText] = useState('');
 
   useEffect(() => {
     let mounted = true;
-    const fetchAll = async () => {
+    const fetchAnalytics = async () => {
       setLoadingAll(true);
       try {
-        const data = await api.getSchools(null);
+        const data = await api.getAnalytics(selectedDistrict?.id || null);
         if (mounted) {
-          setAllSchools(data.schools || []);
+          setEnrollmentData(data.enrollment_data || []);
+          setComparisonData(data.comparison_data || []);
         }
       } catch (err) {
-        console.error("Failed to load all schools", err);
+        console.error("Failed to load analytics", err);
       } finally {
         if (mounted) setLoadingAll(false);
       }
     };
-    fetchAll();
+    fetchAnalytics();
     return () => { mounted = false; };
-  }, []);
-
-  // 1. Enrollment Chart Data (Selected District)
-  const enrollmentData = useMemo(() => {
-    const buckets = {
-      '0': 0, '1-20': 0, '21-50': 0, '51-100': 0, '101-300': 0, '301+': 0
-    };
-    schools.forEach(s => {
-      const e = s.enrollment;
-      if (e === 0) buckets['0']++;
-      else if (e <= 20) buckets['1-20']++;
-      else if (e <= 50) buckets['21-50']++;
-      else if (e <= 100) buckets['51-100']++;
-      else if (e <= 300) buckets['101-300']++;
-      else buckets['301+']++;
-    });
-    return Object.keys(buckets).map(name => ({ name, count: buckets[name] }));
-  }, [schools]);
-
-  // 2. Comparison Chart Data (All Districts)
-  const comparisonData = useMemo(() => {
-    const districtStats = {};
-    allSchools.forEach(s => {
-      const d = s.district || 'Unknown';
-      if (!districtStats[d]) {
-        districtStats[d] = { district: d, zeroEnrollment: 0, singleTeacher: 0 };
-      }
-      if (s.enrollment === 0) {
-        districtStats[d].zeroEnrollment++;
-      } else if (s.teacher_count === 1 && s.enrollment > 0) { 
-        districtStats[d].singleTeacher++;
-      }
-    });
-    return Object.values(districtStats).sort((a, b) => a.district.localeCompare(b.district));
-  }, [allSchools]);
+  }, [selectedDistrict]);
 
   // 3. Table Data
   const sortedAndFilteredSchools = useMemo(() => {
