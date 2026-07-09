@@ -113,24 +113,85 @@ def format_school(mapping: dict) -> dict:
         "district": d
     }
 
-async def load_schools(db: AsyncSession, district: Optional[str] = None) -> list[dict]:
-    query_str = "SELECT * FROM school_complete"
-    if district:
-        query_str += " WHERE district ILIKE :district"
-        res = await db.execute(text(query_str), {"district": f"%{district}%"})
-    else:
-        res = await db.execute(text(query_str))
-        
+def generate_mock_schools(district: str) -> list[dict]:
+    import random
+    # Use deterministic random based on district name so it's consistent across reloads
+    seed = int(hashlib.md5(district.encode()).hexdigest(), 16)
+    random.seed(seed)
+    
+    names = [
+        "Government Primary School",
+        "Panchayat Union Primary School",
+        "Government Upper Primary School",
+        "Mandal Parishad Primary School",
+        "Zilla Parishad High School",
+        "Government Model Primary School",
+    ]
+    villages = ["Central", "North", "South", "East", "West", "Rural", "Valley", "Hills", "Township", "Colony", "Junction", "Cross"]
+    
     schools = []
-    for row in res:
-        schools.append(format_school(dict(row._mapping)))
+    # Generate 8 deterministic mock schools for the district
+    for i in range(8):
+        sid = f"SCH{seed % 100000 + i}"
+        school_type = "primary" if i < 5 else "upper-primary"
+        name = f"{random.choice(names)} {random.choice(villages)} {i+1}"
+        
+        # Distribute statuses:
+        # i = 0, 3: zero enrollment (merge candidate)
+        # i = 1, 4: overloaded (single teacher, >40 students)
+        # i = 2, 5, 6, 7: healthy target
+        if i in [0, 3]:
+            enrollment = 0
+            teacher_count = 1
+        elif i in [1, 4]:
+            enrollment = random.randint(48, 65)
+            teacher_count = 1
+        else:
+            enrollment = random.randint(30, 110)
+            teacher_count = random.randint(2, 4)
+            
+        lat, lng = generate_coords(sid, district)
+        
+        schools.append({
+            "school_id": sid,
+            "name": name,
+            "lat": lat,
+            "lng": lng,
+            "enrollment": enrollment,
+            "teacher_count": teacher_count,
+            "school_type": school_type,
+            "block": f"{district} Block",
+            "district": district
+        })
+    return schools
+
+async def load_schools(db: AsyncSession, district: Optional[str] = None) -> list[dict]:
+    schools = []
+    db_success = False
+    try:
+        query_str = "SELECT * FROM school_complete"
+        if district:
+            query_str += " WHERE district ILIKE :district"
+            res = await db.execute(text(query_str), {"district": f"%{district}%"})
+        else:
+            res = await db.execute(text(query_str))
+            
+        for row in res:
+            schools.append(format_school(dict(row._mapping)))
+        db_success = len(schools) > 0
+    except Exception as e:
+        print(f"Database query failed, falling back to mock data: {e}")
         
     # --- Option B: Dynamic Mock Fallback ---
-    # If all loaded schools have zero enrollment (common with partial dataset imports),
-    # dynamically inject healthy and overloaded schools to simulate recommendations.
-    if schools:
+    # If database is empty, contains no records for this district, or returns all zero-enrollment
+    # (common with partial dataset imports), fall back to rich dynamic mock data.
+    dist_name = district or "Chennai"
+    if not db_success or len(schools) < 3:
+        schools = generate_mock_schools(dist_name)
+    else:
+        # If schools exist but all or almost all are zero enrollment, inject healthy/overloaded variety
         zero_enrollment_count = sum(1 for s in schools if s["enrollment"] == 0)
-        if zero_enrollment_count == len(schools):
+        if zero_enrollment_count == len(schools) or zero_enrollment_count > len(schools) - 2:
             for idx, s in enumerate(schools):
                 if idx % 3 == 0:
                     s["enrollment"] = 55
@@ -146,14 +207,23 @@ async def load_schools(db: AsyncSession, district: Optional[str] = None) -> list
 
 
 async def get_available_districts(db: AsyncSession) -> list[dict]:
-    # Query distinct districts and their associated states from the database
+    rows = []
     try:
         res = await db.execute(text("SELECT district, MIN(state) FROM school_complete WHERE district IS NOT NULL GROUP BY district ORDER BY district"))
         rows = res.all()
-    except Exception:
-        # Fallback if state column isn't accessible
-        res = await db.execute(text("SELECT DISTINCT district FROM school_complete WHERE district IS NOT NULL ORDER BY district"))
-        rows = [(row[0], "Tamil Nadu") for row in res.all()]
+    except Exception as e:
+        print(f"Failed to fetch districts from database, loading default list: {e}")
+        
+    if not rows:
+        # Pre-baked districts list for MVP if DB is empty or unpopulated
+        rows = [
+            ("Chennai", "Tamil Nadu"),
+            ("Madurai", "Tamil Nadu"),
+            ("Coimbatore", "Tamil Nadu"),
+            ("Adilabad", "Telangana"),
+            ("Agar Malwa", "Madhya Pradesh"),
+            ("Agra", "Uttar Pradesh"),
+        ]
         
     seen = []
     for row in rows:
@@ -165,7 +235,7 @@ async def get_available_districts(db: AsyncSession) -> list[dict]:
         # Calculate dynamic center based on state if not hardcoded in DISTRICT_META
         state_center = get_state_center(s)
         center = meta.get("center", state_center)
-        zoom = meta.get("zoom", 11 if d in DISTRICT_META else 9) # zoom out a bit for general state coordinates
+        zoom = meta.get("zoom", 11 if d in DISTRICT_META else 9)
         
         seen.append({
             "id": d,
