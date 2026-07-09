@@ -1,24 +1,29 @@
 """GET /api/recommendations — Runs the rationalization engine for a given district."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from db import get_db
 from logic.optimizer import build_recommendations, get_available_districts
 
 router = APIRouter()
 
 
 @router.get("/districts")
-async def get_districts():
+async def get_districts(db: AsyncSession = Depends(get_db)):
     """
     Returns the list of available districts/constituencies from the data file.
     Each entry includes: id, name, state, center (lat/lng for map pan), zoom level.
     """
-    districts = get_available_districts()
+    districts = await get_available_districts(db)
     return {"districts": districts}
 
 
 @router.get("/recommendations")
-async def get_recommendations(district: Optional[str] = Query(None, description="Filter by district name")):
+async def get_recommendations(
+    district: Optional[str] = Query(None, description="Filter by district name"),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Runs the greedy nearest-neighbor rationalization algorithm for the given district
     and returns merge + redistribute recommendations.
@@ -34,7 +39,7 @@ async def get_recommendations(district: Optional[str] = Query(None, description=
     - rte_compliant: whether the recommendation satisfies RTE Act distance limits
     - reasoning: human-readable explanation
     """
-    recommendations = build_recommendations(district=district)
+    recommendations = await build_recommendations(db, district=district)
 
     merge_count         = sum(1 for r in recommendations if r["type"] == "merge")
     redistribute_count  = sum(1 for r in recommendations if r["type"] == "redistribute")

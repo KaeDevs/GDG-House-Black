@@ -2,6 +2,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.api import router as api_router
+from routes.recommendations import router as recommendations_router
+from routes.schools import router as schools_router
 from db import Base, async_engine
 from contextlib import asynccontextmanager
 
@@ -28,6 +30,8 @@ app.add_middleware(
 )
 
 # Include the API router
+app.include_router(schools_router, prefix="/api")
+app.include_router(recommendations_router, prefix="/api")
 app.include_router(api_router, prefix="/api")
 
 @app.get("/")

@@ -7,11 +7,10 @@ for globally optimal teacher-school assignment.
 """
 
 import math
-import json
-import os
+import hashlib
 from typing import Optional
-
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "schools.json")
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 
 # RTE Act distance thresholds (km)
 RTE_PRIMARY_MAX_KM = 1.0
@@ -49,42 +48,67 @@ DISTRICT_META = {
 }
 
 
-def load_schools(district: Optional[str] = None) -> list[dict]:
-    """
-    Load all schools from the flat JSON array.
-    If `district` is provided, return only schools whose district field matches
-    (case-insensitive). Otherwise return all schools.
-    """
-    with open(DATA_PATH, "r", encoding="utf-8") as f:
-        all_schools = json.load(f)
+def generate_coords(school_id: str, district: str) -> tuple[float, float]:
+    center = DISTRICT_META.get(district, DISTRICT_META.get("Chennai"))["center"]
+    h = int(hashlib.md5(school_id.encode()).hexdigest(), 16)
+    # deterministic random offset between -0.1 and 0.1 degrees
+    lat_offset = ((h % 1000) / 5000.0) - 0.1
+    lng_offset = (((h // 1000) % 1000) / 5000.0) - 0.1
+    return round(center[0] + lat_offset, 4), round(center[1] + lng_offset, 4)
 
+def format_school(mapping: dict) -> dict:
+    sid = str(mapping.get("pseudocode", ""))
+    d = mapping.get("district", "Chennai")
+    
+    # Calculate total enrolment from enrolment1 if available
+    enrollment = 0
+    for k, v in mapping.items():
+        if k.startswith("enrolment1_c") and isinstance(v, (int, float)):
+            enrollment += int(v)
+            
+    lat, lng = generate_coords(sid, d)
+    
+    return {
+        "school_id": sid,
+        "name": f"{mapping.get('school_category', 'School')} {mapping.get('lgd_vill_name', sid)}",
+        "lat": lat,
+        "lng": lng,
+        "enrollment": enrollment,
+        "teacher_count": int(mapping.get("teacher_total_tch") or 0),
+        "school_type": mapping.get("school_type", "primary"),
+        "block": mapping.get("block", ""),
+        "district": d
+    }
+
+async def load_schools(db: AsyncSession, district: Optional[str] = None) -> list[dict]:
+    query_str = "SELECT * FROM school_complete"
     if district:
-        return [s for s in all_schools if s.get("district", "").lower() == district.lower()]
-    return all_schools
+        query_str += " WHERE district ILIKE :district"
+        res = await db.execute(text(query_str), {"district": f"%{district}%"})
+    else:
+        res = await db.execute(text(query_str))
+        
+    schools = []
+    for row in res:
+        schools.append(format_school(dict(row._mapping)))
+    return schools
 
 
-def get_available_districts() -> list[dict]:
-    """
-    Derive available district list from the schools data file, enriched with
-    metadata from DISTRICT_META.  Returns districts sorted alphabetically.
-    """
-    with open(DATA_PATH, "r", encoding="utf-8") as f:
-        all_schools = json.load(f)
-
-    seen = {}
-    for s in all_schools:
-        d = s.get("district", "")
-        if d and d not in seen:
-            meta = DISTRICT_META.get(d, {})
-            seen[d] = {
-                "id": d,
-                "name": meta.get("name", d),
-                "state": meta.get("state", "Tamil Nadu"),
-                "center": meta.get("center", []),
-                "zoom": meta.get("zoom", 12),
-            }
-
-    return sorted(seen.values(), key=lambda x: x["name"])
+async def get_available_districts(db: AsyncSession) -> list[dict]:
+    res = await db.execute(text("SELECT DISTINCT district FROM school_complete ORDER BY district"))
+    districts = [row[0] for row in res if row[0]]
+    
+    seen = []
+    for d in districts:
+        meta = DISTRICT_META.get(d, {})
+        seen.append({
+            "id": d,
+            "name": meta.get("name", d),
+            "state": meta.get("state", "Tamil Nadu"),
+            "center": meta.get("center", [13.0827, 80.2707]),
+            "zoom": meta.get("zoom", 12),
+        })
+    return seen
 
 
 def haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -121,21 +145,8 @@ def get_school_status(school: dict) -> str:
     return "healthy"
 
 
-def build_recommendations(district: Optional[str] = None) -> list[dict]:
-    """
-    Core rationalization engine, optionally scoped to a single district.
-
-    Greedy nearest-neighbor algorithm:
-    1. Flag zero-enrollment schools as merge candidates.
-    2. For each, find the nearest same-type non-candidate school (RTE-aware).
-    3. Flag single-teacher overloaded schools as understaffed.
-    4. Match freed teachers from merges to nearest understaffed schools.
-
-    NOTE: This is intentionally greedy (MVP). For production, replace with:
-    - Google OR-Tools CP-SAT solver for vehicle-routing style assignment
-    - PuLP for LP-based global optimization
-    """
-    schools = load_schools(district=district)
+async def build_recommendations(db: AsyncSession, district: Optional[str] = None) -> list[dict]:
+    schools = await load_schools(db, district=district)
 
     # Classify all schools
     for s in schools:
