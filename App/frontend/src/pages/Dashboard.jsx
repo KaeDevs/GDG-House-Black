@@ -24,6 +24,31 @@ export default function Dashboard() {
   const [selectedDistrict, setSelectedDistrict] = useState(null);   // full district object
   const [districtMenuOpen, setDistrictMenuOpen] = useState(false);
   const districtMenuRef = useRef(null);
+  const [districtSearchQuery, setDistrictSearchQuery] = useState('');
+  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
+  
+  // Reset district search when menu closes
+  useEffect(() => {
+    if (!districtMenuOpen) {
+      setDistrictSearchQuery('');
+    }
+  }, [districtMenuOpen]);
+
+  const handleHeaderSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && headerSearchQuery.trim()) {
+      const query = headerSearchQuery.toLowerCase().trim();
+      const match = districts.find(d => d.name.toLowerCase().includes(query));
+      if (match) {
+        setSelectedDistrict(match);
+        setHeaderSearchQuery('');
+      }
+    }
+  };
+
+  const filteredDropdownDistricts = districts.filter(d => 
+    d.name.toLowerCase().includes(districtSearchQuery.toLowerCase()) ||
+    d.state.toLowerCase().includes(districtSearchQuery.toLowerCase())
+  );
   
   // ── Chat state ─────────────────────────────────────────────────────────
   const [chatHistories, setChatHistories] = useState({});
@@ -220,7 +245,67 @@ export default function Dashboard() {
             {/* Search */}
             <div style={{ position: 'relative', flex: 1 }}>
               <span className="material-symbols-outlined" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'var(--on-surface-variant)' }}>search</span>
-              <input className="search-input" type="text" placeholder="Search schools, constituencies..." />
+              <input 
+                className="search-input" 
+                type="text" 
+                placeholder="Search schools, constituencies..." 
+                value={headerSearchQuery}
+                onChange={e => setHeaderSearchQuery(e.target.value)}
+                onKeyDown={handleHeaderSearchKeyDown}
+              />
+              
+              {/* Autocomplete suggestion dropdown */}
+              {headerSearchQuery.trim() && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  left: 0,
+                  right: 0,
+                  background: 'var(--surface-container-lowest)',
+                  border: '1px solid var(--outline-variant)',
+                  borderRadius: 10,
+                  boxShadow: 'var(--shadow-lg)',
+                  zIndex: 250,
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                }}>
+                  {districts
+                    .filter(d => d.name.toLowerCase().includes(headerSearchQuery.toLowerCase()))
+                    .map(d => (
+                      <button
+                        key={d.id}
+                        onClick={() => {
+                          setSelectedDistrict(d);
+                          setHeaderSearchQuery('');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          textAlign: 'left',
+                          fontSize: '0.875rem',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontFamily: 'Inter, sans-serif',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-container-low)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span style={{ fontWeight: 600, color: 'var(--on-surface)' }}>{d.name}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--on-surface-variant)', opacity: 0.8 }}>{d.state}</span>
+                      </button>
+                    ))}
+                  {districts.filter(d => d.name.toLowerCase().includes(headerSearchQuery.toLowerCase())).length === 0 && (
+                    <div style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--on-surface-variant)', textAlign: 'center' }}>
+                      No matching constituencies found
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* ── DISTRICT SELECTOR ─────────────────────────────────── */}
@@ -257,55 +342,89 @@ export default function Dashboard() {
                     position: 'absolute',
                     top: 'calc(100% + 6px)',
                     left: 0,
-                    minWidth: 200,
+                    minWidth: 240,
+                    maxHeight: '340px',
+                    overflowY: 'auto',
                     background: 'var(--surface-container-lowest)',
                     border: '1px solid var(--outline-variant)',
                     borderRadius: 10,
                     boxShadow: 'var(--shadow-lg)',
                     zIndex: 200,
-                    overflow: 'hidden',
                   }}
                 >
-                  <div style={{ padding: '6px 12px 4px', fontSize: '0.65rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>
-                    Districts / Constituencies
-                  </div>
-                  {districts.length === 0 ? (
-                    <div style={{ padding: '10px 14px', fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>Loading…</div>
-                  ) : (
-                    districts.map(d => (
-                      <button
-                        key={d.id}
-                        onClick={() => handleDistrictSelect(d)}
+                  <div style={{ 
+                    padding: '8px 12px 6px', 
+                    position: 'sticky', 
+                    top: 0, 
+                    background: 'var(--surface-container-lowest)', 
+                    borderBottom: '1px solid var(--outline-variant)', 
+                    zIndex: 10 
+                  }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7, marginBottom: 6 }}>
+                      Districts / Constituencies
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <span className="material-symbols-outlined" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--on-surface-variant)' }}>search</span>
+                      <input
+                        type="text"
+                        placeholder="Search district..."
+                        value={districtSearchQuery}
+                        onChange={(e) => setDistrictSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
                           width: '100%',
-                          padding: '9px 14px',
-                          border: 'none',
-                          background: selectedDistrict?.id === d.id ? 'var(--secondary-container)' : 'transparent',
-                          color: selectedDistrict?.id === d.id ? 'var(--on-secondary-container)' : 'var(--on-surface)',
+                          padding: '6px 8px 6px 28px',
+                          fontSize: '0.8rem',
+                          border: '1px solid var(--outline-variant)',
+                          borderRadius: 6,
+                          outline: 'none',
                           fontFamily: 'Inter, sans-serif',
-                          fontSize: '0.875rem',
-                          fontWeight: selectedDistrict?.id === d.id ? 700 : 400,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          transition: 'background 0.12s',
+                          background: 'var(--surface-container-low)',
                         }}
-                        onMouseEnter={e => { if (selectedDistrict?.id !== d.id) e.currentTarget.style.background = 'var(--surface-container-low)'; }}
-                        onMouseLeave={e => { if (selectedDistrict?.id !== d.id) e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: selectedDistrict?.id === d.id ? 'var(--secondary)' : 'var(--on-surface-variant)' }}>
-                          {selectedDistrict?.id === d.id ? 'radio_button_checked' : 'radio_button_unchecked'}
-                        </span>
-                        <div>
-                          <div>{d.name}</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', opacity: 0.7 }}>{d.state}</div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={{ padding: '4px 0' }}>
+                    {filteredDropdownDistricts.length === 0 ? (
+                      <div style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--on-surface-variant)', textAlign: 'center' }}>
+                        {districts.length === 0 ? 'Loading…' : 'No matches found'}
+                      </div>
+                    ) : (
+                      filteredDropdownDistricts.map(d => (
+                        <button
+                          key={d.id}
+                          onClick={() => handleDistrictSelect(d)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            width: '100%',
+                            padding: '9px 14px',
+                            border: 'none',
+                            background: selectedDistrict?.id === d.id ? 'var(--secondary-container)' : 'transparent',
+                            color: selectedDistrict?.id === d.id ? 'var(--on-secondary-container)' : 'var(--on-surface)',
+                            fontFamily: 'Inter, sans-serif',
+                            fontSize: '0.875rem',
+                            fontWeight: selectedDistrict?.id === d.id ? 700 : 400,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'background 0.12s',
+                          }}
+                          onMouseEnter={e => { if (selectedDistrict?.id !== d.id) e.currentTarget.style.background = 'var(--surface-container-low)'; }}
+                          onMouseLeave={e => { if (selectedDistrict?.id !== d.id) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: selectedDistrict?.id === d.id ? 'var(--secondary)' : 'var(--on-surface-variant)' }}>
+                            {selectedDistrict?.id === d.id ? 'radio_button_checked' : 'radio_button_unchecked'}
+                          </span>
+                          <div>
+                            <div>{d.name}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', opacity: 0.7 }}>{d.state}</div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
               )}
             </div>
           </div>

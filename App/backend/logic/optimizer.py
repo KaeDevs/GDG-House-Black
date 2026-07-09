@@ -48,8 +48,40 @@ DISTRICT_META = {
 }
 
 
-def generate_coords(school_id: str, district: str) -> tuple[float, float]:
-    center = DISTRICT_META.get(district, DISTRICT_META.get("Chennai"))["center"]
+# State centers fallback for geo mapping outside Tamil Nadu
+STATE_CENTERS = {
+    "TELANGANA": [17.8486, 79.1008],
+    "ANDHRA PRADESH": [15.9129, 79.7400],
+    "TAMIL NADU": [11.1271, 78.6569],
+    "KARNATAKA": [15.3173, 75.7139],
+    "KERALA": [10.8505, 76.2711],
+    "MAHARASHTRA": [19.7515, 75.7139],
+    "MADHYA PRADESH": [22.9734, 78.6569],
+    "UTTAR PRADESH": [26.8467, 80.9462],
+    "GUJARAT": [22.2587, 71.1924],
+    "RAJASTHAN": [27.0238, 74.2179],
+    "DELHI": [28.7041, 77.1025],
+    "BIHAR": [25.0961, 85.3131],
+    "WEST BENGAL": [22.9868, 87.8550],
+    "PUNJAB": [31.1471, 75.3412],
+    "HARYANA": [29.0588, 76.0856],
+}
+
+def get_state_center(state_name: Optional[str]) -> list[float]:
+    if not state_name:
+        return [13.0827, 80.2707] # default to Chennai center
+    state_upper = state_name.upper().strip()
+    for key, val in STATE_CENTERS.items():
+        if key in state_upper or state_upper in key:
+            return val
+    return [13.0827, 80.2707] # fallback to Chennai center
+
+def generate_coords(school_id: str, district: str, state: Optional[str] = None) -> tuple[float, float]:
+    if district in DISTRICT_META:
+        center = DISTRICT_META[district]["center"]
+    else:
+        center = get_state_center(state)
+        
     h = int(hashlib.md5(school_id.encode()).hexdigest(), 16)
     # deterministic random offset between -0.1 and 0.1 degrees
     lat_offset = ((h % 1000) / 5000.0) - 0.1
@@ -59,6 +91,7 @@ def generate_coords(school_id: str, district: str) -> tuple[float, float]:
 def format_school(mapping: dict) -> dict:
     sid = str(mapping.get("pseudocode", ""))
     d = mapping.get("district", "Chennai")
+    s = mapping.get("state")
     
     # Calculate total enrolment from enrolment1 if available
     enrollment = 0
@@ -66,7 +99,7 @@ def format_school(mapping: dict) -> dict:
         if k.startswith("enrolment1_c") and isinstance(v, (int, float)):
             enrollment += int(v)
             
-    lat, lng = generate_coords(sid, d)
+    lat, lng = generate_coords(sid, d, s)
     
     return {
         "school_id": sid,
@@ -95,18 +128,33 @@ async def load_schools(db: AsyncSession, district: Optional[str] = None) -> list
 
 
 async def get_available_districts(db: AsyncSession) -> list[dict]:
-    res = await db.execute(text("SELECT DISTINCT district FROM school_complete ORDER BY district"))
-    districts = [row[0] for row in res if row[0]]
-    
+    # Query distinct districts and their associated states from the database
+    try:
+        res = await db.execute(text("SELECT district, MIN(state) FROM school_complete WHERE district IS NOT NULL GROUP BY district ORDER BY district"))
+        rows = res.all()
+    except Exception:
+        # Fallback if state column isn't accessible
+        res = await db.execute(text("SELECT DISTINCT district FROM school_complete WHERE district IS NOT NULL ORDER BY district"))
+        rows = [(row[0], "Tamil Nadu") for row in res.all()]
+        
     seen = []
-    for d in districts:
+    for row in rows:
+        d = row[0]
+        s = row[1] if (len(row) > 1 and row[1]) else "Tamil Nadu"
+        
         meta = DISTRICT_META.get(d, {})
+        
+        # Calculate dynamic center based on state if not hardcoded in DISTRICT_META
+        state_center = get_state_center(s)
+        center = meta.get("center", state_center)
+        zoom = meta.get("zoom", 11 if d in DISTRICT_META else 9) # zoom out a bit for general state coordinates
+        
         seen.append({
             "id": d,
             "name": meta.get("name", d),
-            "state": meta.get("state", "Tamil Nadu"),
-            "center": meta.get("center", [13.0827, 80.2707]),
-            "zoom": meta.get("zoom", 12),
+            "state": s,
+            "center": center,
+            "zoom": zoom,
         })
     return seen
 
