@@ -23,10 +23,8 @@ export default function Dashboard() {
   const [districts, setDistricts]             = useState([]);
   const [selectedDistrict, setSelectedDistrict] = useState(null);   // full district object
   const [districtMenuOpen, setDistrictMenuOpen] = useState(false);
-  const [districtSearchInput, setDistrictSearchInput] = useState('');
   const districtMenuRef = useRef(null);
   const [districtSearchQuery, setDistrictSearchQuery] = useState('');
-  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
   
   // Reset district search when menu closes
   useEffect(() => {
@@ -36,12 +34,12 @@ export default function Dashboard() {
   }, [districtMenuOpen]);
 
   const handleHeaderSearchKeyDown = (e) => {
-    if (e.key === 'Enter' && headerSearchQuery.trim()) {
-      const query = headerSearchQuery.toLowerCase().trim();
+    if (e.key === 'Enter' && searchInput.trim()) {
+      const query = searchInput.toLowerCase().trim();
       const match = districts.find(d => d.name.toLowerCase().includes(query));
       if (match) {
         setSelectedDistrict(match);
-        setHeaderSearchQuery('');
+        setSearchInput('');
       }
     }
   };
@@ -220,7 +218,7 @@ export default function Dashboard() {
     }
     setSelectedDistrict(district);
     setDistrictMenuOpen(false);
-    setDistrictSearchInput('');
+    setDistrictSearchQuery('');
   };
 
   // ── Derived stats ──────────────────────────────────────────────────────
@@ -292,20 +290,16 @@ export default function Dashboard() {
                 className="search-input" 
                 type="text" 
                 placeholder="Search schools, constituencies..." 
-<<<<<<< HEAD
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={handleHeaderSearchKeyDown}
               />
               {isSearching && (
                 <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--outline-variant)', borderTopColor: 'var(--secondary)', animation: 'spin 0.7s linear infinite' }} />
-=======
-                value={headerSearchQuery}
-                onChange={e => setHeaderSearchQuery(e.target.value)}
-                onKeyDown={handleHeaderSearchKeyDown}
-              />
+              )}
               
               {/* Autocomplete suggestion dropdown */}
-              {headerSearchQuery.trim() && (
+              {searchInput.trim() && (
                 <div style={{
                   position: 'absolute',
                   top: 'calc(100% + 8px)',
@@ -320,13 +314,13 @@ export default function Dashboard() {
                   overflowY: 'auto',
                 }}>
                   {districts
-                    .filter(d => d.name.toLowerCase().includes(headerSearchQuery.toLowerCase()))
+                    .filter(d => d.name.toLowerCase().includes(searchInput.toLowerCase()))
                     .map(d => (
                       <button
                         key={d.id}
                         onClick={() => {
                           setSelectedDistrict(d);
-                          setHeaderSearchQuery('');
+                          setSearchInput('');
                         }}
                         style={{
                           width: '100%',
@@ -349,13 +343,12 @@ export default function Dashboard() {
                         <span style={{ fontSize: '0.72rem', color: 'var(--on-surface-variant)', opacity: 0.8 }}>{d.state}</span>
                       </button>
                     ))}
-                  {districts.filter(d => d.name.toLowerCase().includes(headerSearchQuery.toLowerCase())).length === 0 && (
+                  {districts.filter(d => d.name.toLowerCase().includes(searchInput.toLowerCase())).length === 0 && (
                     <div style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--on-surface-variant)', textAlign: 'center' }}>
                       No matching constituencies found
                     </div>
                   )}
                 </div>
->>>>>>> 49e4d67351daca48e03b60a2c8ec83b03b0195a1
               )}
             </div>
 
@@ -394,11 +387,8 @@ export default function Dashboard() {
                     top: 'calc(100% + 6px)',
                     left: 0,
                     minWidth: 240,
-<<<<<<< HEAD
-=======
                     maxHeight: '340px',
                     overflowY: 'auto',
->>>>>>> 49e4d67351daca48e03b60a2c8ec83b03b0195a1
                     background: 'var(--surface-container-lowest)',
                     border: '1px solid var(--outline-variant)',
                     borderRadius: 10,
@@ -406,45 +396,7 @@ export default function Dashboard() {
                     zIndex: 200,
                   }}
                 >
-<<<<<<< HEAD
-                  <div style={{ padding: '10px', borderBottom: '1px solid var(--outline-variant)' }}>
-                    <div style={{ position: 'relative' }}>
-                      <span className="material-symbols-outlined" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--on-surface-variant)' }}>search</span>
-                      <input 
-                        type="text" 
-                        placeholder="Search district or state..." 
-                        value={districtSearchInput}
-                        onChange={e => setDistrictSearchInput(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px 6px 28px',
-                          borderRadius: 6,
-                          border: '1px solid var(--outline-variant)',
-                          background: 'var(--surface-container-low)',
-                          color: 'var(--on-surface)',
-                          fontSize: '0.8125rem',
-                          fontFamily: 'Inter, sans-serif',
-                          outline: 'none',
-                        }}
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-                  <div style={{ padding: '6px 12px 4px', fontSize: '0.65rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>
-                    Districts / Constituencies
-                  </div>
-                  <div style={{ maxHeight: 350, overflowY: 'auto' }}>
-                  {districts.length === 0 ? (
-                    <div style={{ padding: '10px 14px', fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>Loading…</div>
-                  ) : (
-                    districts.filter(d => 
-                      (d.name || '').toLowerCase().includes(districtSearchInput.toLowerCase()) || 
-                      (d.state || '').toLowerCase().includes(districtSearchInput.toLowerCase())
-                    ).map(d => (
-                      <button
-                        key={`${d.state}-${d.id}`}
-                        onClick={() => handleDistrictSelect(d)}
-=======
+
                   <div style={{ 
                     padding: '8px 12px 6px', 
                     position: 'sticky', 
@@ -464,7 +416,7 @@ export default function Dashboard() {
                         value={districtSearchQuery}
                         onChange={(e) => setDistrictSearchQuery(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
->>>>>>> 49e4d67351daca48e03b60a2c8ec83b03b0195a1
+                        autoFocus
                         style={{
                           width: '100%',
                           padding: '6px 8px 6px 28px',
@@ -475,21 +427,6 @@ export default function Dashboard() {
                           fontFamily: 'Inter, sans-serif',
                           background: 'var(--surface-container-low)',
                         }}
-<<<<<<< HEAD
-                        onMouseEnter={e => { if (selectedDistrict?.id !== d.id) e.currentTarget.style.background = 'var(--surface-container-low)'; }}
-                        onMouseLeave={e => { if (selectedDistrict?.id !== d.id) e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: selectedDistrict?.id === d.id ? 'var(--secondary)' : 'var(--on-surface-variant)' }}>
-                          {selectedDistrict?.id === d.id ? 'radio_button_checked' : 'radio_button_unchecked'}
-                        </span>
-                        <div>
-                          <div>{d.name}</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', opacity: 0.7 }}>{d.state}</div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-=======
                       />
                     </div>
                   </div>
@@ -533,7 +470,6 @@ export default function Dashboard() {
                         </button>
                       ))
                     )}
->>>>>>> 49e4d67351daca48e03b60a2c8ec83b03b0195a1
                   </div>
                 </div>
               )}
