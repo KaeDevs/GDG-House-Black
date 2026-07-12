@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [districts, setDistricts]             = useState([]);
   const [selectedDistrict, setSelectedDistrict] = useState(null);   // full district object
   const [districtMenuOpen, setDistrictMenuOpen] = useState(false);
+  const [districtSearchInput, setDistrictSearchInput] = useState('');
   const districtMenuRef = useRef(null);
   
   // ── Chat state ─────────────────────────────────────────────────────────
@@ -194,6 +195,7 @@ export default function Dashboard() {
     }
     setSelectedDistrict(district);
     setDistrictMenuOpen(false);
+    setDistrictSearchInput('');
   };
 
   // ── Derived stats ──────────────────────────────────────────────────────
@@ -307,7 +309,7 @@ export default function Dashboard() {
                     position: 'absolute',
                     top: 'calc(100% + 6px)',
                     left: 0,
-                    minWidth: 200,
+                    minWidth: 240,
                     background: 'var(--surface-container-lowest)',
                     border: '1px solid var(--outline-variant)',
                     borderRadius: 10,
@@ -316,15 +318,42 @@ export default function Dashboard() {
                     overflow: 'hidden',
                   }}
                 >
+                  <div style={{ padding: '10px', borderBottom: '1px solid var(--outline-variant)' }}>
+                    <div style={{ position: 'relative' }}>
+                      <span className="material-symbols-outlined" style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--on-surface-variant)' }}>search</span>
+                      <input 
+                        type="text" 
+                        placeholder="Search district or state..." 
+                        value={districtSearchInput}
+                        onChange={e => setDistrictSearchInput(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px 6px 28px',
+                          borderRadius: 6,
+                          border: '1px solid var(--outline-variant)',
+                          background: 'var(--surface-container-low)',
+                          color: 'var(--on-surface)',
+                          fontSize: '0.8125rem',
+                          fontFamily: 'Inter, sans-serif',
+                          outline: 'none',
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
                   <div style={{ padding: '6px 12px 4px', fontSize: '0.65rem', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>
                     Districts / Constituencies
                   </div>
+                  <div style={{ maxHeight: 350, overflowY: 'auto' }}>
                   {districts.length === 0 ? (
                     <div style={{ padding: '10px 14px', fontSize: '0.8rem', color: 'var(--on-surface-variant)' }}>Loading…</div>
                   ) : (
-                    districts.map(d => (
+                    districts.filter(d => 
+                      (d.name || '').toLowerCase().includes(districtSearchInput.toLowerCase()) || 
+                      (d.state || '').toLowerCase().includes(districtSearchInput.toLowerCase())
+                    ).map(d => (
                       <button
-                        key={d.id}
+                        key={`${d.state}-${d.id}`}
                         onClick={() => handleDistrictSelect(d)}
                         style={{
                           display: 'flex',
@@ -355,6 +384,7 @@ export default function Dashboard() {
                       </button>
                     ))
                   )}
+                  </div>
                 </div>
               )}
             </div>

@@ -59,140 +59,191 @@ def cleanup_tables(engine):
             conn.execute(text(stmt))
     print("Tables dropped successfully.")
 
-def process_file(file_path, engine, table_name):
-    print(f"\\nProcessing {file_path} into table '{table_name}'...")
-    
+def get_master_pseudocodes(csv_files):
+    for f in csv_files:
+        if get_table_name(f) == "profile1":
+            print(f"Reading {f} to generate master pseudocode list...")
+            with open(f, 'rb') as fp:
+                result = chardet.detect(fp.read(100000))
+            encoding = result['encoding'] or 'utf-8'
+            if encoding.lower() == 'ascii':
+                encoding = 'latin-1'
+                
+            # Read pseudocode and district to sample across all districts
+            df = pd.read_csv(f, encoding=encoding, usecols=lambda c: c.lower().strip() in ['pseudocode', 'district'], low_memory=False)
+            df.columns = [c.lower().strip() for c in df.columns]
+            
+            # Sample 10 schools per district to keep DB size manageable while having all districts
+            sampled = df.groupby('district').head(10)
+            master = set(sampled['pseudocode'].dropna().astype(int).tolist())
+            print(f"Master list generated with {len(master)} pseudocodes across {df['district'].nunique()} districts.")
+            return master
+    return set()
+
+def process_file(file_path, engine, table_name, master_pseudocodes):
+    print(f"\nProcessing {file_path} into table '{table_name}'...")
     start_time = time.time()
-    total_imported = 0
     
-    # Detect encoding
     with open(file_path, 'rb') as f:
-        raw_data = f.read(100000)
-    result = chardet.detect(raw_data)
+        result = chardet.detect(f.read(100000))
     encoding = result['encoding'] or 'utf-8'
     if encoding.lower() == 'ascii':
         encoding = 'latin-1'
-    
-    # Read first chunk to infer types and create table if it doesn't exist
-    try:
-        df_sample = pd.read_csv(file_path, nrows=1000, encoding=encoding, low_memory=False)
-    except Exception as e:
-        print(f"Error reading sample from {file_path}: {e}")
-        return 0
-        
-    df_sample.columns = [c.lower() for c in df_sample.columns]
-    
-    create_stmt = f"CREATE TABLE IF NOT EXISTS {table_name} (\n"
-    columns = []
-    for col, dtype in df_sample.dtypes.items():
-        pg_type = get_postgres_type(dtype)
-        if col in ["pseudocode", "udise_code", "udise"]:
-            pg_type = "BIGINT"
-        columns.append(f"    {col} {pg_type}")
-    create_stmt += ",\n".join(columns) + "\n);"
-    
-    with engine.begin() as conn:
-        conn.execute(text(create_stmt))
         
     try:
-        # HACKATHON DEMO MODE: Limit to 5000 rows.
-        df = pd.read_csv(file_path, encoding=encoding, low_memory=False, nrows=5000)
-        df.columns = [c.lower() for c in df.columns]
-        
-        for col, dtype in df.dtypes.items():
-            if pd.api.types.is_object_dtype(dtype):
-                df[col] = df[col].astype(str).replace("nan", None)
-                
-        try:
-            df.to_sql(table_name, engine, if_exists="append", index=False, method="multi", chunksize=1000)
-            total_imported += len(df)
-            print(f"Loaded {table_name}... {total_imported} rows", flush=True)
-        except Exception as e:
-            print(f"\nFailed to insert data: {e}", flush=True)
+        first_chunk = True
+        imported = 0
+        for chunk in pd.read_csv(file_path, encoding=encoding, low_memory=False, chunksize=20000):
+            chunk.columns = [c.lower().strip() for c in chunk.columns]
             
-    except Exception as e:
-        print(f"\nError reading data: {e}", flush=True)
+            if 'pseudocode' in chunk.columns:
+                chunk = chunk[chunk["pseudocode"].isin(master_pseudocodes)]
+                
+            if chunk.empty:
+                continue
+                
+            if first_chunk:
+                create_stmt = f"CREATE TABLE IF NOT EXISTS {table_name} (\n"
+                columns = []
+                for col, dtype in chunk.dtypes.items():
+                    pg_type = get_postgres_type(dtype)
+                    if col in ["pseudocode", "udise_code", "udise"]:
+                        pg_type = "BIGINT"
+                    columns.append(f"    {col} {pg_type}")
+                create_stmt += ",\n".join(columns) + "\n);"
+                
+                with engine.begin() as conn:
+                    conn.execute(text(create_stmt))
+                first_chunk = False
+                
+            for col, dtype in chunk.dtypes.items():
+                if pd.api.types.is_object_dtype(dtype):
+                    chunk[col] = chunk[col].astype(str).replace("nan", None)
+                    
+            chunk.to_sql(table_name, engine, if_exists="append", index=False, method="multi")
+            imported += len(chunk)
+            print(f"Loaded {imported} rows so far into {table_name}...")
+            
+        elapsed = time.time() - start_time
+        print(f"Finished {file_path} in {elapsed:.2f}s. Total: {imported} rows.")
+        return imported
         
-    elapsed = time.time() - start_time
-    print(f"\nFinished {file_path} in {elapsed:.2f}s")
-    return total_imported
+    except Exception as e:
+        print(f"Failed to process file {file_path}: {e}")
+        return 0
 
 def create_view(engine):
-    print("\\nCreating school_complete view...")
-    tables = ["profile1", "profile2", "facility", "teacher", "enrolment1", "enrolment2"]
+    print("\nCreating school_complete view with aggregated CTEs...")
     
-    with engine.begin() as conn:
-        # Check if tables exist
-        for t in tables:
-            res = conn.execute(text(f"SELECT to_regclass('public.{t}')"))
-            if not res.scalar():
-                print(f"Table {t} does not exist, cannot create view.")
-                return
-
-        # Find join column from profile1
-        res = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'profile1';"))
-        profile_cols = [row[0] for row in res]
-        join_col = "pseudocode" if "pseudocode" in profile_cols else ("udise_code" if "udise_code" in profile_cols else None)
-        
-        if not join_col:
-            print("Could not find a common identifier (pseudocode or udise_code) in profile1 to join tables.")
-            return
+    # Generate SUM statements for enrolment tables
+    e1_cols = []
+    for i in range(1, 13):
+        e1_cols.append(f"c{i}_b")
+        e1_cols.append(f"c{i}_g")
+    e1_cols = ["cpp_b", "cpp_g"] + e1_cols
+    
+    e1_sums = ",\n        ".join([f"SUM(COALESCE({c}, 0)) AS enrolment1_{c}" for c in e1_cols])
+    e2_sums = ",\n        ".join([f"SUM(COALESCE({c}, 0)) AS enrolment2_{c}" for c in e1_cols])
+    
+    view_stmt = f"""CREATE OR REPLACE VIEW school_complete AS
+WITH e1_agg AS (
+    SELECT pseudocode,
+        {e1_sums}
+    FROM enrolment1
+    GROUP BY pseudocode
+),
+e2_agg AS (
+    SELECT pseudocode,
+        {e2_sums}
+    FROM enrolment2
+    GROUP BY pseudocode
+)
+SELECT 
+    t0.pseudocode"""
+    
+    def get_columns(table_name):
+        with engine.connect() as conn:
+            res = conn.execute(text(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"))
+            return [r[0] for r in res if r[0] != 'pseudocode']
             
-        view_stmt = f"CREATE OR REPLACE VIEW school_complete AS\nSELECT t0.* "
-        from_stmt = f"FROM profile1 t0\n"
+    try:
+        p1_cols = get_columns("profile1")
+        p2_cols = get_columns("profile2")
+        fac_cols = get_columns("facility")
+        tch_cols = get_columns("teacher")
         
-        for idx, table in enumerate(tables[1:], start=1):
-            res = conn.execute(text(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table}';"))
-            cols = [row[0] for row in res]
-            if join_col in cols:
-                for c in cols:
-                    if c != join_col:
-                        view_stmt += f", t{idx}.{c} AS {table}_{c} "
-                from_stmt += f"LEFT JOIN {table} t{idx} ON t0.{join_col} = t{idx}.{join_col}\n"
-                
-        full_stmt = view_stmt + "\n" + from_stmt
-        conn.execute(text("DROP VIEW IF EXISTS school_complete CASCADE;"))
-        conn.execute(text(full_stmt))
+        for c in p1_cols:
+            view_stmt += f",\n    t0.{c}"
+        for c in p2_cols:
+            view_stmt += f",\n    t1.{c} AS profile2_{c}"
+        for c in fac_cols:
+            view_stmt += f",\n    t2.{c} AS facility_{c}"
+        for c in tch_cols:
+            view_stmt += f",\n    t3.{c} AS teacher_{c}"
+            
+        for c in e1_cols:
+            view_stmt += f",\n    e1.enrolment1_{c}"
+        for c in e1_cols:
+            view_stmt += f",\n    e2.enrolment2_{c}"
+            
+        view_stmt += f"""
+FROM profile1 t0
+LEFT JOIN profile2 t1 ON t0.pseudocode = t1.pseudocode
+LEFT JOIN teacher t3 ON t0.pseudocode = t3.pseudocode
+LEFT JOIN facility t2 ON t0.pseudocode = t2.pseudocode
+LEFT JOIN e1_agg e1 ON t0.pseudocode = e1.pseudocode
+LEFT JOIN e2_agg e2 ON t0.pseudocode = e2.pseudocode;
+"""
+        with engine.begin() as conn:
+            conn.execute(text("DROP VIEW IF EXISTS school_complete CASCADE;"))
+            conn.execute(text(view_stmt))
         print("school_complete view created successfully.")
+    except Exception as e:
+        print(f"Error creating view: {e}")
 
 def verify_and_print(engine):
-    print("\\n--- VERIFICATION ---")
+    print("\n--- VERIFICATION ---")
     with engine.begin() as conn:
-        res = conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public';"))
-        tables = [row[0] for row in res]
-        print(f"Tables in public schema: {', '.join(tables)}")
-        
         for table in ["profile1", "profile2", "facility", "teacher", "enrolment1", "enrolment2"]:
-            if table in tables:
+            try:
                 res = conn.execute(text(f"SELECT COUNT(*) FROM {table};"))
-                count = res.scalar()
-                print(f"Imported {table} : {count} rows")
-            else:
-                print(f"Imported {table} : 0 rows (TABLE MISSING)")
+                print(f"Imported {table} : {res.scalar()} rows")
+                res = conn.execute(text(f"SELECT COUNT(DISTINCT pseudocode) FROM {table};"))
+                print(f"Distinct pseudocodes in {table}: {res.scalar()}")
+            except:
+                pass
                 
-        if "school_complete" in tables:
+        try:
             res = conn.execute(text("SELECT COUNT(*) FROM school_complete;"))
-            print(f"school_complete view : {res.scalar()} rows")
+            print(f"\nschool_complete view total rows : {res.scalar()} rows")
+            
+            res = conn.execute(text("SELECT COUNT(teacher_total_tch), COUNT(enrolment1_c1_b) FROM school_complete;"))
+            counts = res.fetchone()
+            print(f"Teacher count in view: {counts[0]}")
+            print(f"Enrolment1 c1_b count in view: {counts[1]}")
+        except:
+            pass
 
-if __name__ == "__main__":
+def main():
     base_dir = r"D:\\UDISE"
     
     cleanup_tables(sync_engine)
     
-    print(f"\\nScanning for CSV files in {base_dir}...")
+    print(f"\nScanning for CSV files in {base_dir}...")
     csv_files = find_csv_files(base_dir)
     print(f"Found {len(csv_files)} CSV files.")
     
-    # Dictionary to keep track of total rows per logical table
-    table_counts = {t: 0 for t in MAPPINGS.values()}
+    master_pseudocodes = get_master_pseudocodes(csv_files)
     
     for f in csv_files:
         table_name = get_table_name(f)
         if table_name:
-            imported = process_file(f, sync_engine, table_name)
-            table_counts[table_name] += imported
+            process_file(f, sync_engine, table_name, master_pseudocodes)
         else:
             print(f"Warning: Could not map {f} to a known table.")
             
     create_view(sync_engine)
     verify_and_print(sync_engine)
+
+if __name__ == "__main__":
+    main()

@@ -25,10 +25,18 @@ ENROLLMENT_COLS = [
     'enrolment1_c6_b', 'enrolment1_c6_g', 'enrolment1_c7_b', 'enrolment1_c7_g', 
     'enrolment1_c8_b', 'enrolment1_c8_g', 'enrolment1_c9_b', 'enrolment1_c9_g', 
     'enrolment1_c10_b', 'enrolment1_c10_g', 'enrolment1_c11_b', 'enrolment1_c11_g', 
-    'enrolment1_c12_b', 'enrolment1_c12_g'
+    'enrolment1_c12_b', 'enrolment1_c12_g',
+    'enrolment2_cpp_b', 'enrolment2_cpp_g', 'enrolment2_c1_b', 'enrolment2_c1_g', 
+    'enrolment2_c2_b', 'enrolment2_c2_g', 'enrolment2_c3_b', 'enrolment2_c3_g', 
+    'enrolment2_c4_b', 'enrolment2_c4_g', 'enrolment2_c5_b', 'enrolment2_c5_g', 
+    'enrolment2_c6_b', 'enrolment2_c6_g', 'enrolment2_c7_b', 'enrolment2_c7_g', 
+    'enrolment2_c8_b', 'enrolment2_c8_g', 'enrolment2_c9_b', 'enrolment2_c9_g', 
+    'enrolment2_c10_b', 'enrolment2_c10_g', 'enrolment2_c11_b', 'enrolment2_c11_g', 
+    'enrolment2_c12_b', 'enrolment2_c12_g'
 ]
 ENROLLMENT_SQL = " + ".join([f"COALESCE({c}, 0)" for c in ENROLLMENT_COLS])
-VALID_DATA_CONDITION = f"(COALESCE(teacher_total_tch, 0) > 0 OR ({ENROLLMENT_SQL}) > 0)"
+TEACHER_SQL = "COALESCE(teacher_total_tch, teacher_male + teacher_female + teacher_transgender, 0)"
+VALID_DATA_CONDITION = f"({TEACHER_SQL} > 0 OR ({ENROLLMENT_SQL}) > 0 OR COALESCE(facility_electricity_availability, 0) > 0 OR COALESCE(facility_total_boys_func_toilet, 0) > 0 OR COALESCE(facility_total_girls_func_toilet, 0) > 0 OR COALESCE(facility_pack_water_fun_yn, 0) > 0 OR COALESCE(facility_pack_water_yn, 0) > 0 OR COALESCE(facility_boundary_wall, 0) > 0 OR COALESCE(facility_library_availability, 0) > 0)"
 
 def generate_coords(school_id: str, district: str) -> tuple[float, float]:
     # generic fallback center for India if not mapped
@@ -41,22 +49,39 @@ def generate_coords(school_id: str, district: str) -> tuple[float, float]:
 
 
 async def get_available_districts(db: AsyncSession) -> list[dict]:
-    query = text(f"""
-        SELECT DISTINCT district, state 
-        FROM school_complete 
-        WHERE district IS NOT NULL AND state IS NOT NULL AND {VALID_DATA_CONDITION}
-        ORDER BY state, district
-    """)
+    # Check if district_id exists
+    try:
+        check_col = await db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'school_complete' AND column_name = 'district_id'"))
+        has_district_id = check_col.scalar() is not None
+    except Exception:
+        has_district_id = False
+        
+    if has_district_id:
+        query = text(f"""
+            SELECT DISTINCT district_id, district, state 
+            FROM school_complete 
+            WHERE district IS NOT NULL AND district <> '' AND state IS NOT NULL
+            ORDER BY district ASC
+        """)
+    else:
+        query = text(f"""
+            SELECT DISTINCT district, state 
+            FROM school_complete 
+            WHERE district IS NOT NULL AND district <> '' AND state IS NOT NULL
+            ORDER BY district ASC
+        """)
+        
     res = await db.execute(query)
     districts = []
-    for row in res:
-        d = row.district
-        s = row.state
+    for row in res.mappings():
+        d = row["district"]
+        s = row["state"]
+        dist_id = row.get("district_id")
         districts.append({
-            "id": d,
+            "id": dist_id if dist_id else f"{s}-{d}",
             "name": d,
             "state": s,
-            "center": [], # Map component should handle bounds automatically or we ignore it
+            "center": [],
             "zoom": 10,
         })
     return districts
@@ -73,19 +98,43 @@ def format_school_row(row_mapping: dict) -> dict:
         lat, lng = generate_coords(sid, d)
         
     enrollment = int(row_mapping.get("total_enrollment") or 0)
-    teacher_count = int(row_mapping.get("teacher_total_tch") or 0)
+    
+    # Compute teacher_count
+    tch_total = row_mapping.get("teacher_total_tch")
+    male = int(row_mapping.get("teacher_male") or 0)
+    female = int(row_mapping.get("teacher_female") or 0)
+    transgender = int(row_mapping.get("teacher_transgender") or 0)
+    
+    if tch_total is not None:
+        teacher_count = int(tch_total)
+    else:
+        teacher_count = male + female + transgender
+    
+    facilities = {
+        "electricity": bool(row_mapping.get("facility_electricity_availability")),
+        "water": bool(row_mapping.get("facility_pack_water_fun_yn") or row_mapping.get("facility_pack_water_yn")),
+        "toilet": bool(row_mapping.get("facility_total_boys_func_toilet") or row_mapping.get("facility_total_girls_func_toilet")),
+        "boundary_wall": bool(row_mapping.get("facility_boundary_wall")),
+        "library": bool(row_mapping.get("facility_library_availability"))
+    }
     
     status = "healthy"
     if enrollment == 0:
         status = "zero_enrollment"
-    elif teacher_count == 1 and enrollment > OVERLOAD_ENROLLMENT_THRESHOLD:
-        status = "overloaded"
+    elif teacher_count == 1:
+        status = "single_teacher"
     elif teacher_count == 0 and enrollment > 0:
         status = "understaffed"
+    elif not facilities["water"] or not facilities["toilet"] or not facilities["electricity"]:
+        status = "infrastructure_gap"
+    elif enrollment > 0 and teacher_count > 0 and (enrollment / teacher_count) > 40:
+        status = "needs_audit"
 
+    sch_name = row_mapping.get("school_name") or row_mapping.get("schname") or row_mapping.get("sch_name") or row_mapping.get("lgd_vill_name") or sid
+    
     return {
         "school_id": sid,
-        "name": f"{row_mapping.get('school_category', 'School')} {row_mapping.get('lgd_vill_name', sid)}",
+        "name": str(sch_name).strip(),
         "lat": lat,
         "lng": lng,
         "enrollment": enrollment,
@@ -94,122 +143,154 @@ def format_school_row(row_mapping: dict) -> dict:
         "block": row_mapping.get("block", ""),
         "district": d,
         "status": status,
-        "facilities": {
-            "electricity": bool(row_mapping.get("facility_electricity_availability")),
-            "water": bool(row_mapping.get("facility_pack_water_fun_yn") or row_mapping.get("facility_pack_water_yn")),
-            "toilet": bool(row_mapping.get("facility_total_boys_func_toilet") or row_mapping.get("facility_total_girls_func_toilet")),
-            "boundary_wall": bool(row_mapping.get("facility_boundary_wall")),
-            "library": bool(row_mapping.get("facility_library_availability"))
-        }
+        "facilities": facilities
     }
 
 
 async def build_recommendations(db: AsyncSession, district: Optional[str] = None) -> list[dict]:
-    # We only fetch schools that need recommendations or can be targets to save memory.
-    # But to keep it simple and within the limit of memory for a single district,
-    # we can fetch the necessary columns for all schools in the district.
+    district_clause = ""
+    params = {}
+    
+    try:
+        check_col = await db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'school_complete' AND column_name = 'district_id'"))
+        has_district_id = check_col.scalar() is not None
+    except Exception:
+        has_district_id = False
+
+    if district:
+        if has_district_id:
+            district_clause = " AND district_id = :district"
+            params["district"] = district
+        elif "-" in district:
+            parts = district.split("-", 1)
+            if len(parts) == 2:
+                district_clause = " AND UPPER(state) = UPPER(:state) AND UPPER(district) = UPPER(:district)"
+                params["state"] = parts[0]
+                params["district"] = parts[1]
+            else:
+                district_clause = " AND UPPER(district) = UPPER(:district)"
+                params["district"] = district
+        else:
+            district_clause = " AND UPPER(district) = UPPER(:district)"
+            params["district"] = district
+
     query_str = f"""
+        /* cache bust */
         SELECT 
             pseudocode, district, lgd_vill_name, school_category, school_type, block,
-            teacher_total_tch,
+            teacher_total_tch, teacher_male, teacher_female, teacher_transgender,
             ({ENROLLMENT_SQL}) as total_enrollment,
+            ({TEACHER_SQL}) as calculated_teacher_count,
             facility_electricity_availability, facility_pack_water_yn, facility_pack_water_fun_yn,
             facility_total_boys_func_toilet, facility_total_girls_func_toilet, facility_boundary_wall, facility_library_availability
         FROM school_complete
         WHERE {VALID_DATA_CONDITION}
+        {district_clause}
     """
     
-    params = {}
-    if district:
-        query_str += " AND district ILIKE :district"
-        params["district"] = f"%{district}%"
-        
     res = await db.execute(text(query_str), params)
-    schools = [format_school_row(dict(row._mapping)) for row in res]
-
-    recommendations = []
     
-    # Track schools to avoid double assignment
-    merged_school_ids = set()
-    freed_teachers = []
+    try:
+        schools = [format_school_row(dict(row._mapping)) for row in res]
+        recommendations = []
+    
+        # Track schools to avoid double assignment
+        merged_school_ids = set()
+        freed_teachers = []
 
-    zero_enrollment = [s for s in schools if s["status"] == "zero_enrollment"]
-    overloaded = [s for s in schools if s["status"] == "overloaded"]
-    understaffed = overloaded[:] # clone
+        zero_enrollment = [s for s in schools if s["status"] == "zero_enrollment"]
+        needs_audit = [s for s in schools if s["status"] == "needs_audit"]
+        understaffed = needs_audit[:] # clone
 
-    # Merge recommendations
-    for src in zero_enrollment:
-        candidates = [
-            s for s in schools
-            if s["school_type"] == src["school_type"]
-            and s["status"] != "zero_enrollment"
-            and s["school_id"] != src["school_id"]
-            and s["school_id"] not in merged_school_ids
-        ]
+        # Merge recommendations
+        for src in zero_enrollment:
+            candidates = [
+                s for s in schools
+                if s["school_type"] == src["school_type"]
+                and s["status"] != "zero_enrollment"
+                and s["school_id"] != src["school_id"]
+                and s["school_id"] not in merged_school_ids
+            ]
 
-        if candidates:
-            candidates_with_dist = [(s, haversine(src["lat"], src["lng"], s["lat"], s["lng"])) for s in candidates]
+            if candidates:
+                candidates_with_dist = [(s, haversine(src["lat"], src["lng"], s["lat"], s["lng"])) for s in candidates]
+                candidates_with_dist.sort(key=lambda x: x[1])
+                target, dist = candidates_with_dist[0]
+                
+                rte_ok = dist <= (RTE_PRIMARY_MAX_KM if src["school_type"] == "primary" else RTE_UPPER_PRIMARY_MAX_KM)
+
+                recommendations.append({
+                    "type": "merge",
+                    "source_school": src,
+                    "target_school": target,
+                    "distance_km": dist,
+                    "rte_compliant": rte_ok,
+                    "reasoning": f"Zero-enrollment school '{src['name']}' recommended for closure and merger into '{target['name']}' ({dist:.2f} km away)."
+                })
+                merged_school_ids.add(src["school_id"])
+                freed_teachers.extend([src] * src["teacher_count"])
+                
+        # Redistribute recommendations
+        for teacher_source in freed_teachers:
+            if not understaffed:
+                break
+                
+            candidates_with_dist = [(s, haversine(teacher_source["lat"], teacher_source["lng"], s["lat"], s["lng"])) for s in understaffed]
             candidates_with_dist.sort(key=lambda x: x[1])
             target, dist = candidates_with_dist[0]
             
-            rte_ok = dist <= (RTE_PRIMARY_MAX_KM if src["school_type"] == "primary" else RTE_UPPER_PRIMARY_MAX_KM)
+            if dist <= TEACHER_REDISTRIBUTION_MAX_KM:
+                recommendations.append({
+                    "type": "redistribute",
+                    "source_school": teacher_source,
+                    "target_school": target,
+                    "distance_km": dist,
+                    "rte_compliant": True,
+                    "reasoning": f"Teacher freed from '{teacher_source['name']}' recommended for redeployment to high-PTR school '{target['name']}' ({dist:.2f} km away)."
+                })
+                understaffed.remove(target)
 
-            recommendations.append({
-                "type": "merge",
-                "source_school": src,
-                "target_school": target,
-                "distance_km": dist,
-                "rte_compliant": rte_ok,
-                "reasoning": f"Zero-enrollment school '{src['name']}' recommended for closure and merger into '{target['name']}' ({dist:.2f} km away)."
-            })
-            merged_school_ids.add(src["school_id"])
-            freed_teachers.extend([src] * src["teacher_count"])
-            
-    # Redistribute recommendations
-    for teacher_source in freed_teachers:
-        if not understaffed:
-            break
-            
-        candidates_with_dist = [(s, haversine(teacher_source["lat"], teacher_source["lng"], s["lat"], s["lng"])) for s in understaffed]
-        candidates_with_dist.sort(key=lambda x: x[1])
-        target, dist = candidates_with_dist[0]
-        
-        if dist <= TEACHER_REDISTRIBUTION_MAX_KM:
-            recommendations.append({
-                "type": "redistribute",
-                "source_school": teacher_source,
-                "target_school": target,
-                "distance_km": dist,
-                "rte_compliant": True,
-                "reasoning": f"Teacher freed from '{teacher_source['name']}' recommended for redeployment to overloaded school '{target['name']}' ({dist:.2f} km away)."
-            })
-            understaffed.remove(target)
+        # Infrastructure & Staffing recommendations
+        for s in schools:
+            if s["status"] == "zero_enrollment" or s["school_id"] in merged_school_ids:
+                continue
+                
+            if not s["facilities"]["water"]:
+                recommendations.append({
+                    "type": "infrastructure",
+                    "source_school": s,
+                    "reasoning": f"School '{s['name']}' is missing functional drinking water facilities."
+                })
+            if not s["facilities"]["toilet"]:
+                recommendations.append({
+                    "type": "infrastructure",
+                    "source_school": s,
+                    "reasoning": f"School '{s['name']}' requires urgent toilet construction."
+                })
+            if not s["facilities"]["electricity"]:
+                recommendations.append({
+                    "type": "infrastructure",
+                    "source_school": s,
+                    "reasoning": f"School '{s['name']}' lacks electricity connection."
+                })
+            if not s["facilities"]["library"]:
+                recommendations.append({
+                    "type": "infrastructure",
+                    "source_school": s,
+                    "reasoning": f"School '{s['name']}' lacks a library facility."
+                })
+            if s["status"] == "needs_audit" or s["status"] == "understaffed":
+                recommendations.append({
+                    "type": "staffing",
+                    "source_school": s,
+                    "reasoning": f"School '{s['name']}' has a high Pupil-Teacher Ratio or severe understaffing and urgently needs more teachers."
+                })
 
-    # Infrastructure recommendations
-    for s in schools:
-        if s["status"] == "zero_enrollment" or s["school_id"] in merged_school_ids:
-            continue
-            
-        if not s["facilities"]["water"]:
-            recommendations.append({
-                "type": "infrastructure",
-                "source_school": s,
-                "reasoning": f"School '{s['name']}' is missing functional drinking water facilities."
-            })
-        if not s["facilities"]["toilet"]:
-            recommendations.append({
-                "type": "infrastructure",
-                "source_school": s,
-                "reasoning": f"School '{s['name']}' requires urgent toilet construction."
-            })
-        if not s["facilities"]["electricity"]:
-            recommendations.append({
-                "type": "infrastructure",
-                "source_school": s,
-                "reasoning": f"School '{s['name']}' lacks electricity connection."
-            })
-
-    return recommendations
+        return recommendations
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return []
 
 def haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     R = 6371.0
@@ -223,20 +304,28 @@ def haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 def get_summary_stats(schools: list[dict]) -> dict:
     total = len(schools)
     zero_enroll = sum(1 for s in schools if s["status"] == "zero_enrollment")
-    single_teacher = sum(1 for s in schools if s["teacher_count"] == 1)
-    overloaded_count = sum(1 for s in schools if s["status"] == "overloaded")
+    single_teacher = sum(1 for s in schools if s["status"] == "single_teacher")
+    needs_audit_count = sum(1 for s in schools if s["status"] == "needs_audit")
     
     total_students = sum(s["enrollment"] for s in schools)
     total_teachers = sum(s["teacher_count"] for s in schools)
     
-    students_affected = sum(s["enrollment"] for s in schools if s["status"] != "healthy")
+    # Students Benefited must be defined using business rules:
+    # PTR > 40 OR Single Teacher OR Zero Enrolment OR Missing critical infrastructure.
+    students_affected = sum(
+        s["enrollment"] for s in schools 
+        if s["status"] in ("zero_enrollment", "single_teacher", "infrastructure_gap", "needs_audit", "understaffed")
+    )
+    
+    infra_deficits = sum(1 for s in schools if s["status"] == "infrastructure_gap")
     
     return {
         "total_schools": total,
         "zero_enrollment_schools": zero_enroll,
-        "overloaded_schools": overloaded_count,
+        "needs_audit_schools": needs_audit_count,
         "single_teacher_schools": single_teacher,
-        "healthy_schools": total - zero_enroll - overloaded_count,
+        "infrastructure_deficits": infra_deficits,
+        "healthy_schools": total - zero_enroll - needs_audit_count - single_teacher - infra_deficits,
         "total_students": total_students,
         "students_affected": students_affected,
         "total_teachers": total_teachers,

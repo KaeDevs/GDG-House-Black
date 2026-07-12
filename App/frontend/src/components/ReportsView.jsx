@@ -30,25 +30,43 @@ export default function ReportsView({ selectedDistrict, stats, schools, recommen
       color: 'var(--on-surface)'
     }}>
       {/* Action Bar (Hidden on Print) */}
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 30 }}>
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginBottom: 30 }}>
+        <button 
+          onClick={() => {
+            if (!schools || schools.length === 0) return;
+            const headers = ['School ID', 'Name', 'Enrollment', 'Teachers', 'Status', 'District', 'Type'];
+            const csvRows = [headers.join(',')];
+            schools.forEach(s => {
+              csvRows.push(`${s.school_id},"${s.name}",${s.enrollment},${s.teacher_count},${s.status},${s.district},${s.school_type}`);
+            });
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `SchoolSync_Report_${selectedDistrict?.name || 'All'}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+            background: 'var(--surface-container-highest)', color: 'var(--on-surface)',
+            border: '1px solid var(--outline)', borderRadius: 8, fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'Inter, sans-serif'
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>download</span>
+          Export CSV
+        </button>
         <button 
           onClick={handlePrint}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 16px',
-            background: 'var(--primary)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 8,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: 'Inter, sans-serif'
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+            background: 'var(--primary)', color: 'white', border: 'none',
+            borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif'
           }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>print</span>
-          Export / Print Summary
+          Export PDF
         </button>
       </div>
 

@@ -68,10 +68,11 @@ export default function AnalyticsView({ selectedDistrict, schools, loading }) {
 
   const statusColors = {
     'healthy': 'var(--teal)',
-    'review': 'var(--amber)',
-    'closure': 'var(--red)',
+    'needs_audit': 'var(--amber)',
+    'understaffed': 'var(--orange)',
     'zero_enrollment': 'var(--red)',
-    'overloaded': 'var(--amber)'
+    'single_teacher': 'var(--amber)',
+    'infrastructure_gap': 'var(--purple)'
   };
 
   return (
@@ -119,6 +120,11 @@ export default function AnalyticsView({ selectedDistrict, schools, loading }) {
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="zeroEnrollment" name="Zero Enrollment" fill="var(--red)" radius={[4, 4, 0, 0]} stackId="a" />
                   <Bar dataKey="singleTeacher" name="Single Teacher" fill="var(--amber)" radius={[4, 4, 0, 0]} stackId="a" />
+                  <Bar dataKey="missingElectricity" name="No Electricity" fill="var(--on-surface-variant)" radius={[4, 4, 0, 0]} stackId="a" />
+                  <Bar dataKey="missingWater" name="No Water" fill="var(--blue)" radius={[4, 4, 0, 0]} stackId="a" />
+                  <Bar dataKey="missingToilet" name="No Toilet" fill="var(--purple)" radius={[4, 4, 0, 0]} stackId="a" />
+                  <Bar dataKey="missingWall" name="No Wall" fill="var(--brown)" radius={[4, 4, 0, 0]} stackId="a" />
+                  <Bar dataKey="missingLibrary" name="No Library" fill="var(--teal)" radius={[4, 4, 0, 0]} stackId="a" />
                 </BarChart>
               </ResponsiveContainer>
             )}

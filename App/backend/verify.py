@@ -1,7 +1,6 @@
 import sys
 from sqlalchemy import text
 from db import sync_engine
-from import_data import process_file, find_csv_files, get_table_name, create_view, MAPPINGS
 
 EXPECTED_TABLES = [
     "profile1",
@@ -23,26 +22,7 @@ def verify_and_fix():
     
     if missing_tables:
         print(f"Missing tables: {', '.join(missing_tables)}")
-        print("Attempting to fix missing tables automatically...")
-        
-        base_dir = r"D:\\UDISE"
-        csv_files = find_csv_files(base_dir)
-        
-        for f in csv_files:
-            table_name = get_table_name(f)
-            if table_name in missing_tables:
-                print(f"Auto-importing missing dataset for {table_name}...")
-                process_file(f, sync_engine, table_name)
-                
-        # Re-check after fixing
-        with sync_engine.begin() as conn:
-            res = conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public';"))
-            actual_tables = [row[0] for row in res]
-            
-        still_missing = [t for t in EXPECTED_TABLES if t not in actual_tables]
-        if still_missing:
-            print(f"Failed to auto-fix missing tables: {', '.join(still_missing)}")
-            return False
+        return False
 
     all_data_present = True
     print("\\n--- Row Counts ---")
@@ -63,8 +43,8 @@ def verify_and_fix():
             
         print("\\nVerifying view 'school_complete'...")
         if "school_complete" not in actual_tables:
-            print("View 'school_complete' is missing! Recreating it...")
-            create_view(sync_engine)
+            print("View 'school_complete' is missing!")
+            return False
             
         try:
             res = conn.execute(text("SELECT COUNT(*) FROM school_complete;"))
