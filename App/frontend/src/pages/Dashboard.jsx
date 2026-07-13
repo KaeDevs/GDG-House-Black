@@ -590,11 +590,11 @@ export default function Dashboard() {
                     <div className="skeleton" style={{ height: 60, flex: 1, borderRadius: 8 }} />
                     <div className="skeleton" style={{ height: 60, flex: 1, borderRadius: 8 }} />
                   </div>
-                ) : recommendations.length === 0 ? (
+                ) : mergeRecs.length + redistRecs.length === 0 ? (
                   <div style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)' }}>No priority actions needed at this time.</div>
                 ) : (
                   <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 4 }}>
-                    {recommendations.slice(0, 3).map((rec, idx) => {
+                    {[...mergeRecs, ...redistRecs].slice(0, 3).map((rec, idx) => {
                       const primarySchool = rec.source_school?.name || rec.school?.name || 'Unknown';
                       const isMerge = rec.type === 'merge';
                       return (

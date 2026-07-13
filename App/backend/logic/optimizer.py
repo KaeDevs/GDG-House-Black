@@ -38,11 +38,9 @@ ENROLLMENT_SQL = " + ".join([f"COALESCE({c}, 0)" for c in ENROLLMENT_COLS])
 TEACHER_SQL = "COALESCE(teacher_total_tch, teacher_male + teacher_female + teacher_transgender, 0)"
 VALID_DATA_CONDITION = f"({TEACHER_SQL} > 0 OR ({ENROLLMENT_SQL}) > 0 OR COALESCE(facility_electricity_availability, 0) > 0 OR COALESCE(facility_total_boys_func_toilet, 0) > 0 OR COALESCE(facility_total_girls_func_toilet, 0) > 0 OR COALESCE(facility_pack_water_fun_yn, 0) > 0 OR COALESCE(facility_pack_water_yn, 0) > 0 OR COALESCE(facility_boundary_wall, 0) > 0 OR COALESCE(facility_library_availability, 0) > 0)"
 
-<<<<<<< HEAD
-def generate_coords(school_id: str, district: str) -> tuple[float, float]:
-    # generic fallback center for India if not mapped
-    center = [20.5937, 78.9629]
-=======
+# District-specific meta overrides (zoom, custom center)
+DISTRICT_META = {}
+
 # State centers fallback for geo mapping outside Tamil Nadu
 STATE_CENTERS = {
     "TELANGANA": [17.8486, 79.1008],
@@ -72,56 +70,20 @@ def get_state_center(state_name: Optional[str]) -> list[float]:
     return [13.0827, 80.2707] # fallback to Chennai center
 
 def generate_coords(school_id: str, district: str, state: Optional[str] = None) -> tuple[float, float]:
-    if district in DISTRICT_META:
-        center = DISTRICT_META[district]["center"]
-    else:
-        center = get_state_center(state)
+    center = get_state_center(state)
         
->>>>>>> 49e4d67351daca48e03b60a2c8ec83b03b0195a1
     h = int(hashlib.md5(school_id.encode()).hexdigest(), 16)
     # deterministic random offset
     lat_offset = ((h % 1000) / 50.0) - 1.0
     lng_offset = (((h // 1000) % 1000) / 50.0) - 1.0
     return round(center[0] + lat_offset, 4), round(center[1] + lng_offset, 4)
 
-<<<<<<< HEAD
+    h = int(hashlib.md5(school_id.encode()).hexdigest(), 16)
+    # deterministic random offset
+    lat_offset = ((h % 1000) / 50.0) - 1.0
+    lng_offset = (((h // 1000) % 1000) / 50.0) - 1.0
+    return round(center[0] + lat_offset, 4), round(center[1] + lng_offset, 4)
 
-async def get_available_districts(db: AsyncSession) -> list[dict]:
-    # Check if district_id exists
-    try:
-        check_col = await db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'school_complete' AND column_name = 'district_id'"))
-        has_district_id = check_col.scalar() is not None
-    except Exception:
-        has_district_id = False
-        
-    if has_district_id:
-        query = text(f"""
-            SELECT DISTINCT district_id, district, state 
-            FROM school_complete 
-            WHERE district IS NOT NULL AND district <> '' AND state IS NOT NULL
-            ORDER BY district ASC
-        """)
-    else:
-        query = text(f"""
-            SELECT DISTINCT district, state 
-            FROM school_complete 
-            WHERE district IS NOT NULL AND district <> '' AND state IS NOT NULL
-            ORDER BY district ASC
-        """)
-        
-    res = await db.execute(query)
-    districts = []
-    for row in res.mappings():
-        d = row["district"]
-        s = row["state"]
-        dist_id = row.get("district_id")
-        districts.append({
-            "id": dist_id if dist_id else f"{s}-{d}",
-            "name": d,
-            "state": s,
-            "center": [],
-            "zoom": 10,
-=======
 def format_school(mapping: dict) -> dict:
     sid = str(mapping.get("pseudocode", ""))
     d = mapping.get("district", "Chennai")
@@ -330,9 +292,8 @@ async def get_available_districts(db: AsyncSession) -> list[dict]:
             "state": s,
             "center": center,
             "zoom": zoom,
->>>>>>> 49e4d67351daca48e03b60a2c8ec83b03b0195a1
         })
-    return districts
+    return seen
 
 
 def format_school_row(row_mapping: dict) -> dict:

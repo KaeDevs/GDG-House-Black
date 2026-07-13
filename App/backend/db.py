@@ -11,12 +11,6 @@ if os.path.exists(".env"):
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-<<<<<<< HEAD
-    raise RuntimeError("DATABASE_URL environment variable is missing. Configure it in App/backend/.env for local development or Render Environment Variables for production.")
-
-if "your-neon-hostname" in DATABASE_URL or "user:password" in DATABASE_URL:
-    raise RuntimeError("DATABASE_URL still contains placeholder values. Please update it with your actual Neon credentials.")
-=======
     print("\n" + "=" * 80)
     print(" ERROR: DATABASE_URL environment variable is not set!")
     print(" - For local development: Create a '.env' file in App/backend/ and add:")
@@ -34,7 +28,6 @@ if "your-neon-hostname" in DATABASE_URL or "user:password" in DATABASE_URL:
         "DATABASE_URL contains placeholder values ('your-neon-hostname' or 'user:password'). "
         "Please update it with your actual database credentials."
     )
->>>>>>> 49e4d67351daca48e03b60a2c8ec83b03b0195a1
 
 # Parse and print masked URL
 import urllib.parse
